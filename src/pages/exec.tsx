@@ -11,6 +11,9 @@ import TrendChart from "../components/TrendChart";
 import { volumeTrend } from "../lib/mockTrendData";
 import { TrendingDown, TrendingUp, Sparkles } from "lucide-react";
 
+import { useExecVolumeKpi } from "../hooks/useExecVolumeKpi";
+import { formatBBLs, formatPctDecimal } from "../lib/format";
+
 /* ======================================================
    CONFIG
 ====================================================== */
@@ -54,6 +57,7 @@ const EXEC_UPDATES = [
 export default function Exec() {
   const history = useHistory();
   const [activeMetric, setActiveMetric] = React.useState<string | null>(null);
+  const { data: volumeKpi, loading: volumeLoading } = useExecVolumeKpi();
 
   return (
     <AppLayout>
@@ -188,11 +192,29 @@ export default function Exec() {
                 gap: "1.25rem",
               }}
             >
-              <KPI label="VOLUME" value="195.9" vsYTD={2.4} vsLastMonth={-1.8} vsTarget={-3.2}
-                icon="volume" iconBg={METRIC_COLORS.volume}
-                active={activeMetric === "volume"}
-                onIconClick={() => setActiveMetric(p => (p === "volume" ? null : "volume"))}
-              />
+<KPI
+  label="VOLUME"
+  icon="volume"
+  iconBg={METRIC_COLORS.volume}
+  active={activeMetric === "volume"}
+  onIconClick={() => setActiveMetric(p => (p === "volume" ? null : "volume"))}
+  value={
+    volumeLoading || !volumeKpi
+      ? "—"
+      : formatBBLs(volumeKpi.data.value)
+  }
+  vsYTD={
+    volumeLoading || !volumeKpi
+      ? 0
+      : formatPctDecimal(volumeKpi.data.vs_ytd_pct)
+  }
+  vsLastMonth={
+    volumeLoading || !volumeKpi
+      ? 0
+      : formatPctDecimal(volumeKpi.data.vs_mom_pct)
+  }
+/>
+
               <KPI label="NET REVENUE" value="$1.2B" vsYTD={4.8} vsLastMonth={1.2} vsTarget={0.9}
                 icon="revenue" iconBg={METRIC_COLORS.revenue}
                 active={activeMetric === "revenue"}
