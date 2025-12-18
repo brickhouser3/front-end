@@ -1,14 +1,15 @@
 const { themes: prismThemes } = require("prism-react-renderer");
 
-customFields: {
-  apiBaseUrl: "https://ci-capabilities.vercel.app",
-},
-
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: "Mission Control",
   tagline: "Executive Performance Intelligence",
   favicon: "img/mbmc_favicon.png",
+
+  // ✅ MOVE customFields HERE
+  customFields: {
+    apiBaseUrl: "https://ci-capabilities.vercel.app",
+  },
 
   headTags: [
     {
@@ -29,12 +30,12 @@ const config = {
   // ================================
   // 🌐 CUSTOM DOMAIN CONFIG
   // ================================
-url: "https://brickhouser3.github.io",
-baseUrl: "/ci_capabilities/",
-trailingSlash: false,
+  url: "https://brickhouser3.github.io",
+  baseUrl: "/ci_capabilities/",
+  trailingSlash: false,
 
-organizationName: "brickhouser3",
-projectName: "ci_capabilities",
+  organizationName: "brickhouser3",
+  projectName: "ci_capabilities",
 
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
