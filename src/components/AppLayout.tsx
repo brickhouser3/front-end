@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import FilterBar from "./FilterBar";
+import { UserProvider } from "../context/UserContext";
 
 export default function AppLayout({
   children,
@@ -8,58 +9,49 @@ export default function AppLayout({
 }) {
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
 
-  useEffect(() => {
-    if (!window.APP_USER) {
-      window.APP_USER = { firstName: "Cody" };
-    }
-  }, []);
-
   return (
-    <div
-      style={{
-        height: "100vh",
-        width: "100vw",
-
-        display: "flex",
-        flexDirection: "row",
-
-        backgroundColor: "#ffffff",
-        overflow: "hidden",
-      }}
-    >
-      {/* ================= FILTER BAR ================= */}
+    <UserProvider>
       <div
         style={{
-          flexShrink: 0,
-          zIndex: 10,
-
-          height: "100%",          // 🔑 allow sidebar to inherit full height
-          display: "flex",         // 🔑 required for child stretch
-        }}
-      >
-        <FilterBar
-          collapsed={filtersCollapsed}
-          onToggle={() => setFiltersCollapsed(c => !c)}
-        />
-      </div>
-
-      {/* ================= MAIN CONTENT ================= */}
-      <div
-        style={{
-          flex: 1,
-          minWidth: 0,
-          height: "100%",
-
+          height: "100vh",
+          width: "100vw",
+          display: "flex",
+          flexDirection: "row",
           backgroundColor: "#ffffff",
-          position: "relative",
-
-          display: "flex",         // 🔑 enables child pages to grow
-          flexDirection: "column",
-          overflow: "hidden",      // 🔑 scrolling handled by pages
+          overflow: "auto",
         }}
       >
-        {children}
+        {/* ================= FILTER BAR ================= */}
+        <div
+          style={{
+            flexShrink: 0,
+            zIndex: 10,
+            height: "100%", // allow sidebar to inherit full height
+            display: "flex",
+          }}
+        >
+          <FilterBar
+            collapsed={filtersCollapsed}
+            onToggle={() => setFiltersCollapsed(c => !c)}
+          />
+        </div>
+
+        {/* ================= MAIN CONTENT ================= */}
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            height: "100%",
+            backgroundColor: "#ffffff",
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "auto", // pages control scrolling
+          }}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </UserProvider>
   );
 }

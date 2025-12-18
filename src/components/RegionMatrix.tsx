@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   BarChart3,
   DollarSign,
@@ -8,23 +8,98 @@ import {
   LayoutGrid,
   Gauge,
   Megaphone,
+  ChevronRight,
 } from "lucide-react";
 
-/**
- * Regions (rows)
- */
+import { useDrillState, createRowPath } from "./DrillEngine";
+
+/* ======================================================
+   TYPES
+====================================================== */
+
+type RegionMatrixProps = {
+  selectedMetric?: string | null;
+};
+
+/* ======================================================
+   LAYOUT CONSTANTS (SINGLE SOURCE OF TRUTH)
+====================================================== */
+
+const FIRST_COL_WIDTH = "180px";
+const COLUMN_GAP = "0.4rem";
+const ROW_PADDING_X = "0.35rem";
+const ROW_PADDING_Y = "0.4rem";
+
+const MATRIX_GRID = (kpiCount: number) =>
+  `${FIRST_COL_WIDTH} repeat(${kpiCount}, minmax(0, 1fr))`;
+
+const columnCellStyle: React.CSSProperties = {
+  width: "100%",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1.15,
+};
+
+/* ======================================================
+   CONFIG
+====================================================== */
+
 const regions = [
   { key: "NE", name: "Northeast" },
   { key: "MW", name: "Midwest" },
-  { key: "S", name: "South" },
-  { key: "W", name: "West" },
-  { key: "C", name: "Central" },
-  { key: "O", name: "Other" },
+  { key: "S", name: "Great Lakes" },
+  { key: "W", name: "Southeast" },
+  { key: "C", name: "South Central" },
+  { key: "O", name: "West" },
 ];
 
-/**
- * KPIs (columns)
- */
+const statesByRegion: Record<string, { key: string; name: string }[]> = {
+  NE: [
+    { key: "NY", name: "New York" },
+    { key: "MA", name: "Massachusetts" },
+    { key: "PA", name: "Pennsylvania" },
+    { key: "NJ", name: "New Jersey" },
+    { key: "CT", name: "Connecticut" },
+  ],
+  MW: [
+    { key: "IL", name: "Illinois" },
+    { key: "OH", name: "Ohio" },
+    { key: "MI", name: "Michigan" },
+    { key: "IN", name: "Indiana" },
+    { key: "WI", name: "Wisconsin" },
+  ],
+  S: [
+    { key: "TX", name: "Texas" },
+    { key: "FL", name: "Florida" },
+    { key: "GA", name: "Georgia" },
+    { key: "NC", name: "North Carolina" },
+    { key: "TN", name: "Tennessee" },
+  ],
+  W: [
+    { key: "CA", name: "California" },
+    { key: "AZ", name: "Arizona" },
+    { key: "WA", name: "Washington" },
+    { key: "OR", name: "Oregon" },
+    { key: "CO", name: "Colorado" },
+  ],
+  C: [
+    { key: "MO", name: "Missouri" },
+    { key: "KS", name: "Kansas" },
+    { key: "IA", name: "Iowa" },
+    { key: "NE", name: "Nebraska" },
+    { key: "OK", name: "Oklahoma" },
+  ],
+  O: [
+    { key: "PR", name: "Puerto Rico" },
+    { key: "HI", name: "Hawaii" },
+    { key: "AK", name: "Alaska" },
+    { key: "GU", name: "Guam" },
+    { key: "VI", name: "Virgin Islands" },
+  ],
+};
+
 const kpis = [
   { key: "volume", label: "Volume", icon: BarChart3 },
   { key: "revenue", label: "Net Rev", icon: DollarSign },
@@ -36,74 +111,51 @@ const kpis = [
   { key: "adshare", label: "Ad Share", icon: Megaphone },
 ];
 
-/**
- * Dummy region KPI data
- */
-const data: Record<
-  string,
-  Record<string, { value: string; delta: number }>
-> = {
-  NE: {
-    volume: { value: "101.2", delta: 1.6 },
-    revenue: { value: "$1.1B", delta: 0.4 },
-    share: { value: "24.3%", delta: 0.6 },
-    pods: { value: "412K", delta: 1.4 },
-    taps: { value: "92.1K", delta: 0.8 },
-    displays: { value: "127K", delta: 2.2 },
-    avd: { value: "7.9", delta: 0.3 },
-    adshare: { value: "18.9%", delta: 0.5 },
-  },
-  MW: {
-    volume: { value: "98.4", delta: -0.8 },
-    revenue: { value: "$0.9B", delta: -0.6 },
-    share: { value: "22.9%", delta: -0.2 },
-    pods: { value: "385K", delta: -0.6 },
-    taps: { value: "88.6K", delta: -0.3 },
-    displays: { value: "119K", delta: -0.7 },
-    avd: { value: "7.5", delta: -0.1 },
-    adshare: { value: "17.6%", delta: -0.4 },
-  },
-  S: {
-    volume: { value: "103.9", delta: 2.4 },
-    revenue: { value: "$1.3B", delta: 1.9 },
-    share: { value: "26.7%", delta: 1.1 },
-    pods: { value: "468K", delta: 2.1 },
-    taps: { value: "97.4K", delta: 1.9 },
-    displays: { value: "138K", delta: 3.1 },
-    avd: { value: "8.2", delta: 0.6 },
-    adshare: { value: "20.3%", delta: 1.1 },
-  },
-  W: {
-    volume: { value: "97.1", delta: -1.3 },
-    revenue: { value: "$0.8B", delta: -1.1 },
-    share: { value: "21.4%", delta: -0.5 },
-    pods: { value: "351K", delta: -1.2 },
-    taps: { value: "84.2K", delta: -1.1 },
-    displays: { value: "112K", delta: -1.5 },
-    avd: { value: "7.3", delta: -0.2 },
-    adshare: { value: "16.8%", delta: -0.6 },
-  },
-  C: {
-    volume: { value: "100.6", delta: 0.5 },
-    revenue: { value: "$1.0B", delta: 0.3 },
-    share: { value: "23.6%", delta: 0.3 },
-    pods: { value: "402K", delta: 0.4 },
-    taps: { value: "90.3K", delta: 0.5 },
-    displays: { value: "125K", delta: 1.0 },
-    avd: { value: "7.8", delta: 0.2 },
-    adshare: { value: "18.1%", delta: 0.2 },
-  },
-  O: {
-    volume: { value: "95.8", delta: -2.1 },
-    revenue: { value: "$0.6B", delta: -1.8 },
-    share: { value: "20.8%", delta: -0.9 },
-    pods: { value: "298K", delta: -2.3 },
-    taps: { value: "76.9K", delta: -2.0 },
-    displays: { value: "98K", delta: -2.8 },
-    avd: { value: "6.9", delta: -0.5 },
-    adshare: { value: "15.9%", delta: -0.9 },
-  },
-};
+/* ======================================================
+   DUMMY DATA
+====================================================== */
+
+const makeCell = (value: string, delta: number) => ({ value, delta });
+
+const regionData: Record<string, Record<string, { value: string; delta: number }>> =
+  Object.fromEntries(
+    regions.map((r, i) => [
+      r.key,
+      {
+        volume: makeCell((95 + i * 2).toFixed(1), 1.2 - i * 0.2),
+        revenue: makeCell(`$${(0.8 + i * 0.05).toFixed(2)}B`, 0.4 - i * 0.1),
+        share: makeCell((22 + i * 0.6).toFixed(1) + "%", 0.5 - i * 0.1),
+        pods: makeCell(`${380 + i * 12}K`, 1.1 - i * 0.2),
+        taps: makeCell(`${85 + i * 2.3}K`, 0.7 - i * 0.1),
+        displays: makeCell(`${115 + i * 4}K`, 1.6 - i * 0.3),
+        avd: makeCell((7.4 + i * 0.15).toFixed(1), 0.3 - i * 0.05),
+        adshare: makeCell((17.5 + i * 0.4).toFixed(1) + "%", 0.4 - i * 0.1),
+      },
+    ])
+  );
+
+const stateData: Record<string, Record<string, { value: string; delta: number }>> =
+  Object.fromEntries(
+    Object.values(statesByRegion)
+      .flat()
+      .map((s, i) => [
+        s.key,
+        {
+          volume: makeCell((18 + i * 0.9).toFixed(1), 0.8 - i * 0.05),
+          revenue: makeCell(`$${(0.12 + i * 0.01).toFixed(2)}B`, 0.3 - i * 0.04),
+          share: makeCell((4.2 + i * 0.2).toFixed(1) + "%", 0.2 - i * 0.03),
+          pods: makeCell(`${68 + i * 2}K`, 0.6 - i * 0.05),
+          taps: makeCell(`${14 + i * 0.6}K`, 0.4 - i * 0.04),
+          displays: makeCell(`${22 + i * 1.1}K`, 0.7 - i * 0.06),
+          avd: makeCell((6.5 + i * 0.1).toFixed(1), 0.2 - i * 0.03),
+          adshare: makeCell((3.8 + i * 0.15).toFixed(1) + "%", 0.2 - i * 0.04),
+        },
+      ])
+  );
+
+/* ======================================================
+   HELPERS
+====================================================== */
 
 function deltaColor(delta: number) {
   if (delta > 0) return "#166534";
@@ -111,103 +163,247 @@ function deltaColor(delta: number) {
   return "#6b7280";
 }
 
-export default function RegionMatrix() {
+/* ======================================================
+   COMPONENT
+====================================================== */
+
+export default function RegionMatrix({ selectedMetric }: RegionMatrixProps) {
+  const drill = useDrillState();
+  const [hoverCol, setHoverCol] = useState<number | null>(null);
+
   return (
-    <div style={{ background: "var(--mc-bg-surface)", padding: "0.25rem" }}>
-      {/* Column headers */}
+    <div
+      style={{
+        padding: "0.25rem",
+        fontFamily:
+          "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        fontVariantNumeric: "tabular-nums",
+        height: "100%",
+        overflow: "auto",
+      }}
+    >
+      {/* ================= STICKY HEADERS ================= */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: `160px repeat(${kpis.length}, minmax(0, 1fr))`,
-          gap: "0.6rem",
-          marginBottom: "0.35rem",
+          position: "sticky",
+          top: 0,
+          zIndex: 2,
+          background: "white",
+          borderBottom: "1px solid rgba(0,0,0,0.06)",
         }}
       >
-        <div />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: MATRIX_GRID(kpis.length),
+            gap: COLUMN_GAP,
+            padding: `${ROW_PADDING_Y} ${ROW_PADDING_X}`,
+            alignItems: "stretch",
+          }}
+        >
+          <div />
+          {kpis.map((kpi, idx) => {
+            const Icon = kpi.icon;
+            const isHovered = hoverCol === idx;
 
-        {kpis.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <div
-              key={kpi.key}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "1px",
-              }}
-            >
-              <Icon size={16} color="#000" />
-              <span
+            return (
+              <div
+                key={kpi.key}
+                onMouseEnter={() => setHoverCol(idx)}
+                onMouseLeave={() => setHoverCol(null)}
                 style={{
-                  fontSize: "0.6rem",
-                  fontWeight: 500,
-                  color: "#9ca3af", // light gray
-                  letterSpacing: "0.02em",
-                  textTransform: "uppercase",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: isHovered
+                    ? "rgba(59,130,246,0.06)"
+                    : "transparent",
+                  transition: "background 120ms ease",
                 }}
               >
-                {kpi.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Region rows */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-        {regions.map((region) => (
-          <div
-            key={region.key}
-            style={{
-              display: "grid",
-              gridTemplateColumns: `160px repeat(${kpis.length}, minmax(0, 1fr))`,
-              gap: "0.6rem",
-              padding: "0.40rem 0.25rem",
-              borderRadius: "8px",
-              transition: "background 0.15s ease",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background =
-                "rgba(11,30,58,0.04)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
-          >
-            <div style={{ fontWeight: 600, color: "#000" }}>
-              {region.name}
-            </div>
-
-            {kpis.map((kpi) => {
-              const cell = data[region.key]?.[kpi.key];
-              if (!cell) return <div key={kpi.key} />;
-
-              return (
-                <div
-                  key={kpi.key}
-                  style={{
-                    textAlign: "center",
-                    fontSize: "0.8rem",
-                    color: "#000",
-                  }}
-                >
-                  <div>{cell.value}</div>
-                  <div
+                <div style={columnCellStyle}>
+                  <Icon size={13} />
+                  <span
                     style={{
-                      fontSize: "0.7rem",
-                      fontWeight: 600,
-                      color: deltaColor(cell.delta),
+                      fontSize: "0.65rem",
+                      fontWeight: 500,
+                      color: "#9ca3af",
+                      marginTop: "2px",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {cell.delta > 0 ? "+" : ""}
-                    {cell.delta}%
-                  </div>
+                    {kpi.label}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================= ROWS ================= */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.05rem" }}>
+        {regions.map(region => {
+          const regionPath = createRowPath([
+            { type: "region", id: region.key },
+          ]);
+          const regionExpanded = drill.isOpen(regionPath);
+
+          return (
+            <React.Fragment key={region.key}>
+              {/* REGION ROW */}
+              <div
+                onClick={() => drill.toggle(regionPath)}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: MATRIX_GRID(kpis.length),
+                  gap: COLUMN_GAP,
+                  padding: `${ROW_PADDING_Y} ${ROW_PADDING_X}`,
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  background: regionExpanded
+                    ? "rgba(11,30,58,0.08)"
+                    : "transparent",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 650,
+                    fontSize: "1.0rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <ChevronRight
+                    size={14}
+                    style={{
+                      transform: regionExpanded
+                        ? "rotate(90deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 0.15s ease",
+                    }}
+                  />
+                  {region.name}
+                </div>
+
+                {kpis.map((kpi, idx) => {
+                  const cell = regionData[region.key][kpi.key];
+                  const faded =
+                    selectedMetric && selectedMetric !== kpi.key;
+
+                  const isHovered = hoverCol === idx;
+
+                  return (
+                    <div
+                      key={kpi.key}
+                      onMouseEnter={() => setHoverCol(idx)}
+                      onMouseLeave={() => setHoverCol(null)}
+                      style={{
+                        ...columnCellStyle,
+                        opacity: faded ? 0.35 : 1,
+                        background: isHovered
+                          ? "rgba(59,130,246,0.04)"
+                          : "transparent",
+                        transition: "background 120ms ease",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: ".9rem" }}>
+                        {cell.value}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.5rem",
+                          fontWeight: 600,
+                          color: deltaColor(cell.delta),
+                        }}
+                      >
+                        {cell.delta > 0 ? "+" : ""}
+                        {cell.delta.toFixed(2)}%
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* STATE ROWS */}
+              {regionExpanded &&
+                statesByRegion[region.key].map(state => {
+                  const statePath = createRowPath([
+                    { type: "region", id: region.key },
+                    { type: "state", id: state.key },
+                  ]);
+
+                  return (
+                    <div
+                      key={state.key}
+                      onClick={e => {
+                        e.stopPropagation();
+                        drill.toggle(statePath);
+                      }}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: MATRIX_GRID(kpis.length),
+                        gap: COLUMN_GAP,
+                        padding: `${ROW_PADDING_Y} ${ROW_PADDING_X}`,
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        background: "rgba(11,30,58,0.04)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "0.75rem",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          paddingLeft: "18px",
+                        }}
+                      >
+                        <ChevronRight size={12} />
+                        {state.name}
+                      </div>
+
+                      {kpis.map((kpi, idx) => {
+                        const cell = stateData[state.key][kpi.key];
+                        const isHovered = hoverCol === idx;
+
+                        return (
+                          <div
+                            key={kpi.key}
+                            onMouseEnter={() => setHoverCol(idx)}
+                            onMouseLeave={() => setHoverCol(null)}
+                            style={{
+                              ...columnCellStyle,
+                              background: isHovered
+                                ? "rgba(59,130,246,0.04)"
+                                : "transparent",
+                              transition: "background 120ms ease",
+                            }}
+                          >
+                            <div style={{ fontWeight: 500, fontSize: "0.7rem" }}>
+                              {cell.value}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.6rem",
+                                fontWeight: 600,
+                                color: deltaColor(cell.delta),
+                              }}
+                            >
+                              {cell.delta > 0 ? "+" : ""}
+                              {cell.delta.toFixed(2)}%
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );

@@ -2,25 +2,46 @@ import React, { useEffect, useState } from "react";
 import { ArrowDown } from "lucide-react";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 
+import { useUser } from "../context/UserContext";
+
 export default function Home() {
   const [launching, setLaunching] = useState(false);
   const [boost, setBoost] = useState(false);
-  const [firstName, setFirstName] = useState<string | null>(null);
 
+  // 👇 Local display name (authoritative for landing page)
+  const [displayName, setDisplayName] = useState("Traveler");
+
+  const { firstName: contextFirstName } = useUser();
   const execUrl = useBaseUrl("/exec");
 
+  /* ======================================================
+     NAME RESOLUTION (SINGLE SOURCE OF TRUTH)
+  ====================================================== */
   useEffect(() => {
-    if (window.APP_USER?.firstName) {
-      setFirstName(window.APP_USER.firstName);
+    if (typeof window === "undefined") return;
+
+    const stored = localStorage.getItem("firstName");
+
+    if (stored) {
+      setDisplayName(stored);
+    } else if (contextFirstName) {
+      // fallback to context once
+      localStorage.setItem("firstName", contextFirstName);
+      setDisplayName(contextFirstName);
+    } else {
+      localStorage.setItem("firstName", "Traveler");
+      setDisplayName("Traveler");
     }
-  }, []);
+  }, [contextFirstName]);
 
   const handleLaunch = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
-    setBoost(true);
 
+    setBoost(true);
     setTimeout(() => setLaunching(true), 120);
-    setTimeout(() => (window.location.href = execUrl), 750);
+    setTimeout(() => {
+      window.location.href = execUrl;
+    }, 750);
   };
 
   return (
@@ -35,9 +56,10 @@ export default function Home() {
         <div className="stars stars-medium" />
         <div className="stars stars-fast" />
 
-        {firstName && (
-          <div className="welcome-text">Welcome, {firstName}</div>
-        )}
+        {/* ✅ CORRECT NAME */}
+        <div className="welcome-text">
+          Welcome, {displayName}
+        </div>
 
         {/* LOGO */}
         <div className={`logo-glow-wrapper ${boost ? "boost" : ""}`}>
@@ -56,10 +78,10 @@ export default function Home() {
         </a>
       </div>
 
+      {/* =============================
+         STYLES
+      ==============================*/}
       <style>{`
-        /* =============================
-           CANVAS
-        ==============================*/
         .launch-bg {
           position: fixed;
           inset: 0;
@@ -81,9 +103,6 @@ export default function Home() {
             opacity 0.6s ease;
         }
 
-        /* =============================
-           DARK OVERLAY (CONTRAST FIX)
-        ==============================*/
         .dark-overlay {
           position: absolute;
           inset: 0;
@@ -94,9 +113,6 @@ export default function Home() {
           z-index: 0;
         }
 
-        /* =============================
-           CONTENT STAGE
-        ==============================*/
         .shake-layer {
           position: relative;
           z-index: 1;
@@ -123,9 +139,6 @@ export default function Home() {
           100% { transform: translate(0, 0); }
         }
 
-        /* =============================
-           STARS
-        ==============================*/
         .stars {
           position: absolute;
           inset: 0;
@@ -157,9 +170,6 @@ export default function Home() {
         @keyframes starsRiseMedium { to { background-position: 0 -320px; } }
         @keyframes starsRiseFast { to { background-position: 0 -520px; } }
 
-        /* =============================
-           WELCOME TEXT (FIXED SIZE)
-        ==============================*/
         .welcome-text {
           font-size: 0.9rem;
           letter-spacing: 0.18em;
@@ -168,9 +178,6 @@ export default function Home() {
           margin-bottom: 1rem;
         }
 
-        /* =============================
-           LOGO (RESPONSIVE FIX)
-        ==============================*/
         .logo-glow-wrapper {
           position: relative;
           margin-bottom: 2.25rem;
@@ -195,9 +202,6 @@ export default function Home() {
           display: block;
         }
 
-        /* =============================
-           THRUST
-        ==============================*/
         .logo-thrust {
           position: absolute;
           top: 100%;
@@ -229,9 +233,6 @@ export default function Home() {
           to { opacity: 1; transform: translateX(-50%) scaleY(1.35); }
         }
 
-        /* =============================
-           CTA (READABLE FIX)
-        ==============================*/
         .launch-cta {
           display: flex;
           flex-direction: column;

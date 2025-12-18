@@ -1,212 +1,65 @@
 import React from "react";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 import {
-  Calendar,
-  Map,
-  Package,
   ChevronDown,
+  Clock,
+  Map,
+  Layers,
+  Target,
+  Package,
 } from "lucide-react";
 
-/* ----------------------------------------
- * Vegapunk Font
- * -------------------------------------- */
-const vegapunkFont = `
-@font-face {
-  font-family: "Vegapunk";
-  src: url("/fonts/Vegapunk.otf") format("opentype");
-  font-weight: normal;
-  font-style: normal;
-}
-`;
+/* ======================================================
+   DROPDOWN
+====================================================== */
 
-const astronautCss = `
-@keyframes astronautShine {
-  0% {
-    transform: translateX(-120%);
-  }
-  60% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(120%);
-  }
-}
-
-@keyframes glowPulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.astronaut-wrapper {
-  position: relative;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* ---- GLOW ---- */
-.astronaut-glow {
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(242,214,117,0.25) 0%,
-    rgba(242,214,117,0.15) 40%,
-    rgba(242,214,117,0.0) 70%
-  );
-  filter: blur(10px);
-  transition:
-    opacity 200ms ease,
-    filter 200ms ease,
-    transform 200ms ease;
-  opacity: 0.6;
-  z-index: 0;
-}
-
-.astronaut-wrapper:hover .astronaut-glow {
-  opacity: 1;
-  filter: blur(14px);
-  animation: glowPulse 600ms ease-out;
-}
-
-/* ---- ICON ---- */
-.astronaut-icon {
-  position: relative;
-  z-index: 1;
-  --astronaut-mask: url("/img/astronaut_white_smoothed_highres.png");
-}
-
-/* ---- SHINE (masked to silhouette) ---- */
-.astronaut-shine {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    120deg,
-    rgba(255,255,255,0.0) 40%,
-    rgba(255,255,255,0.55) 50%,
-    rgba(255,255,255,0.0) 60%
-  );
-  transform: translateX(-120%);
-  animation: astronautShine 6.5s ease-in-out infinite;
-  pointer-events: none;
-
-  -webkit-mask-image: var(--astronaut-mask);
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: contain;
-
-  mask-image: var(--astronaut-mask);
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: contain;
-}
-
-/* ---- FILTER LABEL ---- */
-.filter-label {
-  margin-top: 0.3rem;
-  font-family: Inter, system-ui, sans-serif;
-  font-size: 0.6rem;
-  letter-spacing: 0.22em;
-  font-weight: 600;
-  color: #F3E7A3;
-  opacity: 0;
-  transform: translateY(-6px);
-  transition:
-    opacity 180ms ease,
-    transform 180ms ease;
-  pointer-events: none;
-}
-
-.astronaut-wrapper:hover .filter-label {
-  opacity: 0.95;
-  transform: translateY(0);
-}
-`;
-
-/* ----------------------------------------
- * Dropdown FilterItem
- * -------------------------------------- */
-function FilterItem({
-  icon,
+function Dropdown({
   label,
-  collapsed,
   options,
 }: {
-  icon: React.ReactNode;
   label: string;
-  collapsed: boolean;
   options: string[];
 }) {
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState(options[0]);
-  const ref = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
+    <div style={{ position: "relative" }}>
       <button
         onClick={() => setOpen(o => !o)}
-        title={collapsed ? `${label}: ${value}` : undefined}
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
           width: "100%",
-          minHeight: 30,
-          padding: collapsed ? "0.35rem" : "0.35rem 0.55rem",
+          background: "rgba(255,255,255,0.1)",
+          border: "1px solid rgba(255,255,255,0.22)",
           borderRadius: "7px",
-          background: "#ffffff",
-          border: "1px solid rgba(0,0,0,0.12)",
-          color: "#0b1e3a",
-          cursor: "pointer",
+          padding: "0.45rem 0.55rem",
           fontSize: "0.7rem",
-          fontWeight: 600,
+          color: "#ffffff",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          backdropFilter: "blur(6px)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          {icon}
-          {!collapsed && <span>{label}</span>}
-        </div>
-
-        {!collapsed && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-            <span style={{ fontSize: "0.65rem", color: "#374151" }}>
-              {value}
-            </span>
-            <ChevronDown size={12} />
-          </div>
-        )}
+        <span>
+          {label}: <strong>{value}</strong>
+        </span>
+        <ChevronDown size={14} />
       </button>
 
-      {open && !collapsed && (
+      {open && (
         <div
           style={{
             position: "absolute",
             top: "110%",
             left: 0,
             right: 0,
-            background: "#ffffff",
-            border: "1px solid rgba(0,0,0,0.12)",
+            background: "#0b1e3a",
+            border: "1px solid rgba(255,255,255,0.25)",
             borderRadius: "7px",
-            boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
             zIndex: 50,
+            boxShadow: "0 14px 30px rgba(0,0,0,0.45)",
           }}
         >
           {options.map(opt => (
@@ -217,10 +70,14 @@ function FilterItem({
                 setOpen(false);
               }}
               style={{
-                padding: "0.35rem 0.55rem",
+                padding: "0.45rem 0.6rem",
                 fontSize: "0.7rem",
                 cursor: "pointer",
-                background: opt === value ? "#f3f4f6" : "#ffffff",
+                color: "#ffffff",
+                background:
+                  opt === value
+                    ? "rgba(255,255,255,0.14)"
+                    : "transparent",
               }}
             >
               {opt}
@@ -232,9 +89,91 @@ function FilterItem({
   );
 }
 
-/* ----------------------------------------
- * FilterBar
- * -------------------------------------- */
+/* ======================================================
+   SECTION
+====================================================== */
+
+function Section({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <div style={{ marginBottom: "0.4rem" }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: "100%",
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02))",
+          border: "1px solid rgba(242,214,117,0.28)",
+          borderRadius: "9px",
+          padding: "0.5rem 0.55rem",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          cursor: "pointer",
+          boxShadow:
+            "inset 0 0 0.5px rgba(255,255,255,0.25), 0 0 12px rgba(242,214,117,0.18)",
+          backdropFilter: "blur(6px)",
+        }}
+      >
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.6rem",
+            fontFamily: "Inter, system-ui",
+            fontSize: "0.78rem",
+            fontWeight: 500,
+            letterSpacing: "0.32em",
+            textTransform: "uppercase",
+            color: "#F7E9A6",
+            textShadow:
+              "0 1px 2px rgba(0,0,0,0.6), 0 0 10px rgba(242,214,117,0.45)",
+          }}
+        >
+          <Icon size={18} />
+          {title}
+        </span>
+
+        <ChevronDown
+          size={16}
+          style={{
+            color: "#F7E9A6",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 150ms ease",
+          }}
+        />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            paddingTop: "0.45rem",
+            paddingLeft: "0.3rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.45rem",
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ======================================================
+   FILTER BAR
+====================================================== */
+
 export default function FilterBar({
   collapsed,
   onToggle,
@@ -242,149 +181,199 @@ export default function FilterBar({
   collapsed: boolean;
   onToggle: () => void;
 }) {
-  const width = collapsed ? 64 : 220;
+  const width = collapsed ? 64 : 260;
   const bgUrl = useBaseUrl("/img/mbmc_filterbar_bg.png");
-  const astronautImg = useBaseUrl("/img/astronaut_white_smoothed_highres.png");
+  const logoUrl = useBaseUrl("/img/mbmc_logo.png");
+
+  const firstName =
+    typeof window !== "undefined"
+      ? localStorage.getItem("firstName") || "Traveler"
+      : "Traveler";
 
   return (
-    <>
-      <style>{vegapunkFont}</style>
-      <style>{astronautCss}</style>
-
-      <aside
+    <aside
+      className="filterbar-root"
+      style={{
+        width,
+        minWidth: width,
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
+        transition: "width 220ms ease",
+      }}
+    >
+      {/* BACKGROUND */}
+      <div
         style={{
-          width,
-          minWidth: width,
-          height: "100%",
+          position: "absolute",
+          inset: 0,
+          backgroundImage: `url(${bgUrl})`,
+          backgroundSize: "auto 100%",
+          filter: "blur(4px) brightness(1.05)",
+          transform: "scale(1.05)",
+        }}
+      />
+
+      {/* STARS */}
+      <div className="stars stars-slow" />
+      <div className="stars stars-medium" />
+      <div className="stars stars-fast" />
+
+      {/* CONTENT */}
+      <div
+        style={{
           position: "relative",
-          overflow: "hidden",
-          transition: "width 220ms ease, min-width 220ms ease",
+          zIndex: 1,
+          height: "100%",
+          padding: collapsed ? "0.9rem 0.45rem" : "1.1rem 0.9rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "1rem",
         }}
       >
-        {/* BACKGROUND */}
+        {/* LOGO */}
         <div
+          className="logo-hover-zone"
           style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: `url(${bgUrl})`,
-            backgroundSize: "auto 100%",
-            backgroundPosition: "top left",
-            filter: "blur(4px) brightness(1.05)",
-            transform: "scale(1.05)",
-          }}
-        />
-
-        {/* STARS */}
-        <div className="shooting-stars">
-          <div className="stars-slow" />
-          <div className="stars-medium" />
-          <div className="stars-fast" />
-        </div>
-
-        {/* CONTENT */}
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
             display: "flex",
             flexDirection: "column",
-            height: "100%",
-            padding: collapsed ? "0.7rem 0.45rem" : "0.9rem 0.6rem",
-            gap: "0.9rem",
+            alignItems: "center",
+            marginTop: "1.4rem",
           }}
         >
-          {/* FILTER TOGGLE */}
-          <div className="astronaut-wrapper" style={{ alignSelf: "center" }}>
-            <button
-              onClick={onToggle}
-              title="Toggle filters"
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-              }}
-            >
-              <div className="astronaut-glow" />
-              <div className="astronaut-icon">
-                <img
-                  src={astronautImg}
-                  alt="Filters"
-                  style={{
-                    width: collapsed ? 50 : 75,
-                    height: collapsed ? 50 : 75,
-                    display: "block",
-                  }}
-                />
-                <div className="astronaut-shine" />
-              </div>
-            </button>
-
-            <div className="filter-label">FILTERS</div>
-          </div>
-
-          {/* FILTERS */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-            <FilterItem
-              icon={<Calendar size={14} />}
-              label="Timeframe"
-              collapsed={collapsed}
-              options={["Latest Week", "L4W", "L12W", "YTD"]}
-            />
-            <FilterItem
-              icon={<Map size={14} />}
-              label="Geography"
-              collapsed={collapsed}
-              options={["United States", "Region", "State"]}
-            />
-            <FilterItem
-              icon={<Package size={14} />}
-              label="Product"
-              collapsed={collapsed}
-              options={["All Brands", "Core", "Beyond Beer"]}
-            />
-          </div>
-
-          <div style={{ flex: 1 }} />
-
-          {/* BRAND SIGNATURE */}
-          <div
-            style={{
-              textAlign: "center",
-              lineHeight: 1.05,
-              opacity: collapsed ? 0 : 1,
-              transition: "opacity 200ms ease",
-              pointerEvents: collapsed ? "none" : "auto",
-            }}
+          <button
+            onClick={onToggle}
+            className="logo-float-wrapper"
+            style={{ background: "none", border: "none", padding: 0 }}
           >
-            <div
+            <img
+              src={logoUrl}
+              alt="Filters"
+              className="logo-float"
               style={{
-                fontFamily: "Vegapunk, sans-serif",
-                fontSize: "1.3rem",
-                letterSpacing: "0.14em",
-                color: "#E6C85C",
-                opacity: 0.9,
-                textShadow: "0 1px 2px rgba(0,0,0,0.35)",
+                width: collapsed ? 72 : 115,
+                transition: "width 220ms ease",
               }}
-            >
-              MEGABRAND
-            </div>
+            />
+          </button>
 
-            <div
-              style={{
-                fontFamily: "Inter, system-ui, sans-serif",
-                fontSize: "0.9rem",
-                letterSpacing: "0.18em",
-                color: "#F7E9A6",
-                opacity: 0.85,
-                textShadow: "0 1px 2px rgba(0,0,0,0.35)",
-              }}
-            >
-              MISSION CONTROL
-            </div>
+          <div className="logo-hover-text">
+            {collapsed ? "FILTER" : "COLLAPSE"}
           </div>
         </div>
-      </aside>
-    </>
+
+        {/* FILTER GROUPS */}
+        {!collapsed && (
+          <>
+            <Section title="Time" icon={Clock}>
+              <Dropdown label="Period" options={["YTD", "QTD", "MTD", "L4W", "L12W", "L52W"]} />
+            </Section>
+
+            <Section title="Geography" icon={Map}>
+              <Dropdown label="Level" options={["Region", "State", "Wholesaler"]} />
+            </Section>
+
+            <Section title="Channel" icon={Layers}>
+              <Dropdown label="View" options={["Macro", "Planning", "Sub"]} />
+            </Section>
+
+            <Section title="Decision Point" icon={Target}>
+              <Dropdown label="Type" options={["Position", "Name"]} />
+            </Section>
+
+            <Section title="Product" icon={Package}>
+              <Dropdown label="Dimension" options={["Brand Flag", "Type", "Megabrand", "WAMP"]} />
+            </Section>
+          </>
+        )}
+
+        {/* USER */}
+        {!collapsed && (
+          <div
+            style={{
+              marginTop: "auto",
+              fontSize: "0.65rem",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              opacity: 0.65,
+              color: "#F7E9A6",
+              textAlign: "center",
+            }}
+          >
+            Welcome, {firstName}
+          </div>
+        )}
+      </div>
+
+      {/* =============================
+         ANIMATIONS
+      ==============================*/}
+      <style>{`
+        .stars {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .stars-slow {
+          background-image:
+            radial-gradient(1px 6px at 20% 20%, rgba(255,255,255,0.35), transparent),
+            radial-gradient(1px 6px at 70% 80%, rgba(212,175,55,0.35), transparent);
+          animation: starsRiseSlow 22s linear infinite;
+        }
+
+        .stars-medium {
+          background-image:
+            radial-gradient(1px 8px at 40% 60%, rgba(255,255,255,0.45), transparent),
+            radial-gradient(1px 8px at 80% 30%, rgba(212,175,55,0.45), transparent);
+          animation: starsRiseMedium 14s linear infinite;
+        }
+
+        .stars-fast {
+          background-image:
+            radial-gradient(1px 10px at 55% 40%, rgba(255,255,255,0.6), transparent),
+            radial-gradient(1px 10px at 90% 70%, rgba(212,175,55,0.6), transparent);
+          animation: starsRiseFast 8s linear infinite;
+        }
+
+        @keyframes starsRiseSlow { to { background-position: 0 -180px; } }
+        @keyframes starsRiseMedium { to { background-position: 0 -320px; } }
+        @keyframes starsRiseFast { to { background-position: 0 -520px; } }
+
+        .logo-float {
+          animation: zeroGravity 7.5s ease-in-out infinite;
+          filter: drop-shadow(0 0 18px rgba(242,214,117,0.35));
+        }
+
+        .logo-float-wrapper:hover .logo-float {
+          animation-play-state: paused;
+          filter: drop-shadow(0 0 30px rgba(242,214,117,0.6));
+          transform: scale(1.04);
+        }
+
+        @keyframes zeroGravity {
+          0% { transform: translateY(0px) rotate(0deg); }
+          25% { transform: translateY(-4px) rotate(-0.4deg); }
+          50% { transform: translateY(2px) rotate(0.3deg); }
+          75% { transform: translateY(-3px) rotate(-0.2deg); }
+          100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        .logo-hover-text {
+          margin-top: 0.35rem;
+          font-size: 0.55rem;
+          letter-spacing: 0.3em;
+          font-weight: 700;
+          color: #F7E9A6;
+          opacity: 0;
+          transition: opacity 150ms ease;
+          text-transform: uppercase;
+        }
+
+        .logo-hover-zone:hover .logo-hover-text {
+          opacity: 0.85;
+        }
+      `}</style>
+    </aside>
   );
 }

@@ -22,9 +22,14 @@ const config = {
     v4: true,
   },
 
-  url: "https://brickhouser3.github.io",
-  baseUrl: "/ci_capabilities/",
+  // ================================
+  // 🌐 CUSTOM DOMAIN CONFIG
+  // ================================
+  url: "https://mbmc-launch.app",
+  baseUrl: "/",
+  trailingSlash: false,
 
+  // These can stay for deploy tooling, even with custom domains
   organizationName: "brickhouser3",
   projectName: "ci_capabilities",
 

@@ -8,8 +8,12 @@ import {
   MapPin,
   Activity,
   Megaphone,
+  Target,
 } from "lucide-react";
 
+/* =========================
+   ICON MAP
+========================= */
 const ICONS: Record<string, React.ReactNode> = {
   volume: <BarChart3 size={18} />,
   revenue: <DollarSign size={18} />,
@@ -21,12 +25,16 @@ const ICONS: Record<string, React.ReactNode> = {
   adshare: <Share2 size={18} />,
 };
 
+/* =========================
+   KPI CARD
+========================= */
 export default function KPI({
   label,
   labelColor,
   value,
   vsYTD,
   vsLastMonth,
+  vsTarget,          // ✅ NEW
   icon,
   iconBg,
   active,
@@ -37,6 +45,7 @@ export default function KPI({
   value: string;
   vsYTD: number;
   vsLastMonth: number;
+  vsTarget?: number; // percent vs target
   icon: string;
   iconBg?: string;
   active?: boolean;
@@ -51,11 +60,11 @@ export default function KPI({
         padding: "1rem",
         display: "flex",
         flexDirection: "column",
-        gap: "0.55rem",
+        gap: "0.6rem",
         cursor: "pointer",
 
         boxShadow: active
-          ? `0 0 0 2px ${iconBg ?? "#CBD5E1"}, 0 10px 24px rgba(10,22,51,0.12)`
+          ? `0 0 0 2px ${iconBg ?? "#CBD5E1"}, 0 12px 26px rgba(10,22,51,0.14)`
           : "0 8px 20px rgba(10,22,51,0.08)",
 
         transform: active ? "translateY(-1px)" : "translateY(0)",
@@ -98,8 +107,8 @@ export default function KPI({
 
         <div
           style={{
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             borderRadius: "50%",
             background: iconBg ?? "#E5E7EB",
             display: "flex",
@@ -114,10 +123,10 @@ export default function KPI({
         </div>
       </div>
 
-      {/* VALUE */}
+      {/* MAIN VALUE */}
       <div
         style={{
-          fontSize: "1.6rem",
+          fontSize: "1.65rem",
           fontWeight: 700,
           color: "#0A1633",
           lineHeight: 1.1,
@@ -126,12 +135,32 @@ export default function KPI({
         {value}
       </div>
 
-      {/* COMPARISONS (YTD + MoM only) */}
+      {/* AGAINST TARGET (NEW) */}
+      {typeof vsTarget === "number" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            fontSize: "0.7rem",
+            fontWeight: 600,
+            color: vsTarget >= 0 ? "#166534" : "#b91c1c",
+            opacity: 0.9,
+          }}
+        >
+          <Target size={13} />
+          vs Target: {vsTarget >= 0 ? "+" : ""}
+          {vsTarget}%
+        </div>
+      )}
+
+      {/* COMPARISONS */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           fontSize: "0.75rem",
+          marginTop: "0.15rem",
         }}
       >
         <Comparison label="YTD" value={vsYTD} />
@@ -141,8 +170,12 @@ export default function KPI({
   );
 }
 
+/* =========================
+   COMPARISON CHIP
+========================= */
 function Comparison({ label, value }: { label: string; value: number }) {
   const positive = value > 0;
+
   return (
     <div
       style={{
