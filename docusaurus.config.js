@@ -25,13 +25,12 @@ const config = {
   // ================================
   // 🌐 CUSTOM DOMAIN CONFIG
   // ================================
-  url: "https://mbmc-launch.app",
-  baseUrl: "/",
-  trailingSlash: false,
+url: "https://brickhouser3.github.io",
+baseUrl: "/ci_capabilities/",
+trailingSlash: false,
 
-  // These can stay for deploy tooling, even with custom domains
-  organizationName: "brickhouser3",
-  projectName: "ci_capabilities",
+organizationName: "brickhouser3",
+projectName: "ci_capabilities",
 
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
