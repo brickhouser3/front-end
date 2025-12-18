@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import { KpiResponseV1 } from "../contracts/kpi";
 
 /**
@@ -6,30 +7,28 @@ import { KpiResponseV1 } from "../contracts/kpi";
  * Uses Docusaurus customFields.apiBaseUrl
  */
 export function useExecVolumeKpi() {
+  const { siteConfig } = useDocusaurusContext();
+  const apiBaseUrl = (siteConfig.customFields as any)?.apiBaseUrl;
+
   const [data, setData] = useState<KpiResponseV1 | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     console.log("🔥 useExecVolumeKpi mounted");
+    console.log("🌐 apiBaseUrl:", apiBaseUrl);
+
+    if (!apiBaseUrl) {
+      setError("API base URL is not configured");
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
 
     async function fetchKpi() {
       try {
         setLoading(true);
-
-        // ✅ Resolve API base URL from Docusaurus config
-        const apiBaseUrl =
-          (window as any)?.__docusaurus?.siteConfig?.customFields
-            ?.apiBaseUrl ?? "";
-
-        console.log("🌐 apiBaseUrl:", apiBaseUrl);
-
-        if (!apiBaseUrl) {
-          throw new Error("API base URL is not configured");
-        }
-
         console.log("🚀 Fetching volume KPI...");
 
         const res = await fetch(`${apiBaseUrl}/api/query`, {
@@ -67,7 +66,7 @@ export function useExecVolumeKpi() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apiBaseUrl]);
 
   return { data, loading, error };
 }
