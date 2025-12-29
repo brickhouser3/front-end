@@ -2,6 +2,12 @@ import { useEffect, useState } from "react";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import { KpiResponseV1 } from "../contracts/kpi";
 
+function joinUrl(base: string, path: string) {
+  const b = base.replace(/\/+$/, "");
+  const p = path.replace(/^\/+/, "");
+  return `${b}/${p}`;
+}
+
 /**
  * Fetches the Exec Volume KPI from the Vercel API
  * Normalizes Databricks SQL response → KpiResponseV1
@@ -14,7 +20,7 @@ export function useExecVolumeKpi() {
     | undefined;
 
   const [data, setData] = useState<KpiResponseV1 | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,11 +37,16 @@ export function useExecVolumeKpi() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`${apiBaseUrl}/api/query`, {
+        // ✅ Always build the correct endpoint
+        const url = joinUrl(apiBaseUrl, "api/query");
+
+        const res = await fetch(url, {
           method: "POST",
           headers: {
-            // SIMPLE REQUEST → no CORS preflight
+            // ✅ SIMPLE REQUEST → no CORS preflight
             "Content-Type": "text/plain",
+            // ✅ Helps proxies/servers return JSON consistently
+            Accept: "application/json",
           },
           body: JSON.stringify({
             contract_version: "kpi_request.v1",
@@ -43,26 +54,33 @@ export function useExecVolumeKpi() {
           }),
         });
 
-        if (!res.ok) {
-          throw new Error(`Volume KPI request failed (${res.status})`);
+        // Try to parse JSON, but don't explode if a proxy returns HTML/text
+        let raw: any = null;
+        const text = await res.text();
+        try {
+          raw = text ? JSON.parse(text) : null;
+        } catch {
+          raw = null;
         }
 
-        const raw = await res.json();
+        // ✅ Prefer API-provided error message if present
+        if (!res.ok) {
+          const msg =
+            raw?.error ||
+            raw?.message ||
+            (text ? text.slice(0, 160) : `Request failed (${res.status})`);
+          throw new Error(msg);
+        }
 
-	if (raw?.ok === false) throw new Error(raw?.error ?? "API error");
+        if (raw?.ok === false) {
+          throw new Error(raw?.error ?? "API error");
+        }
 
-        /**
-         * Normalize Databricks SQL API response
-         * Expected shape:
-         * result.data_array[0][0] = KPI value
-         */
         const normalized: KpiResponseV1 = {
           value: raw?.result?.data_array?.[0]?.[0] ?? null,
         };
 
-        if (!cancelled) {
-          setData(normalized);
-        }
+        if (!cancelled) setData(normalized);
       } catch (err: any) {
         if (!cancelled) {
           console.error("❌ useExecVolumeKpi error:", err);
@@ -70,9 +88,7 @@ export function useExecVolumeKpi() {
           setData(null);
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 

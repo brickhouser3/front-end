@@ -8,7 +8,7 @@ const config = {
 
   // ✅ MOVE customFields HERE
   customFields: {
-    apiBaseUrl: "https://ci-capabilities-api.vercel.app",
+    apiBaseUrl: "https://ci-capabilities.vercel.app",
   },
 
   headTags: [
