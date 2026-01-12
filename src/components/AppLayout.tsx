@@ -62,7 +62,6 @@ export default function AppLayout({
         <main style={{ position: "relative", zIndex: 3, paddingLeft: contentLeft, paddingTop: 25 }}>
           <div style={{ padding: "14px 16px" }}>{children}</div>
         </main>
-      </div>
     </UserProvider>
   );
 }
