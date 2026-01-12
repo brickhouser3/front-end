@@ -30,7 +30,6 @@ export default function AppLayout({
       >
         {/* ✅ LUNAR BACKGROUND (behind everything) */}
         <div aria-hidden className="mc-lunar-bg" />
-        </div>
 
         {/* Rail tint: ends exactly at the content band start */}
         <div
@@ -50,7 +49,6 @@ export default function AppLayout({
 
         <TopBar leftOffset={contentLeft} />
 
-
         {/* Filter (unchanged — keep collapse working) */}
         <FilterBar
           collapsed={filtersCollapsed}
@@ -59,9 +57,17 @@ export default function AppLayout({
         />
 
         {/* Content */}
-        <main style={{ position: "relative", zIndex: 3, paddingLeft: contentLeft, paddingTop: 25 }}>
+        <main
+          style={{
+            position: "relative",
+            zIndex: 3,
+            paddingLeft: contentLeft,
+            paddingTop: 25,
+          }}
+        >
           <div style={{ padding: "14px 16px" }}>{children}</div>
         </main>
+      </div>
     </UserProvider>
   );
 }
