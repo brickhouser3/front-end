@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ArrowDown } from "lucide-react";
 import useBaseUrl from "@docusaurus/useBaseUrl";
+import { useHistory } from "@docusaurus/router";
 
 import { useUser } from "../../context/UserContext";
 
@@ -34,15 +35,18 @@ export default function LandingUI() {
     }
   }, [contextFirstName]);
 
+  const history = useHistory();
+
   const handleLaunch = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
 
     setBoost(true);
     setTimeout(() => setLaunching(true), 120);
     setTimeout(() => {
-      window.location.href = execUrl;
+      history.push(execUrl);
     }, 750);
   };
+
 
   return (
     <div className={`launch-bg ${launching ? "launching" : ""}`}>
