@@ -12,7 +12,7 @@ export default function LandingUI() {
   const [displayName, setDisplayName] = useState("Traveler");
 
   const { firstName: contextFirstName } = useUser();
-  const execUrl = useBaseUrl("/exec");
+  const execUrl = useBaseUrl("/executive_summary");
 
   /* ======================================================
      NAME RESOLUTION (SINGLE SOURCE OF TRUTH)
