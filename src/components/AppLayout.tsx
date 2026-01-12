@@ -30,12 +30,6 @@ export default function AppLayout({
       >
         {/* ✅ LUNAR BACKGROUND (behind everything) */}
         <div aria-hidden className="mc-lunar-bg" />
-
-        {/* ✅ OPTIONAL: drifting “rock specks” (above bg, below UI) */}
-        <div aria-hidden className="mc-lunar-rocks">
-          <div className="rocks-large" />
-          <div className="rocks-medium" />
-          <div className="rocks-fine" />
         </div>
 
         {/* Rail tint: ends exactly at the content band start */}
