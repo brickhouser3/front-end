@@ -23,6 +23,12 @@ function safeJsonParse(text: string) {
   }
 }
 
+function joinUrl(base: string, path: string) {
+  const b = base.replace(/\/+$/, "");
+  const p = path.replace(/^\/+/, "");
+  return `${b}/${p}`;
+}
+
 async function runFetch(
   name: string,
   url: string,
@@ -67,72 +73,69 @@ async function runFetch(
 
 export default function SupportPage() {
   const { siteConfig } = useDocusaurusContext();
+  const customFields = (siteConfig.customFields as any) || {};
 
-  // ✅ Single source of truth: MUST be full endpoint, e.g.
-  // https://ci-capabilities-api.vercel.app/api/query
-  const apiQueryUrl = (siteConfig.customFields as any)?.apiQueryUrl as
-    | string
-    | undefined;
+  // ✅ Preferred: explicit full endpoint
+  const apiProdQueryUrl = customFields.apiProdQueryUrl as string | undefined; // "https://.../api/query"
+
+  // ✅ Fallback: base URL host
+  const apiBaseUrl = customFields.apiBaseUrl as string | undefined; // "https://...vercel.app"
+
+  // ✅ Final safety fallback so localhost never bricks
+  const hardcoded = "https://ci-capabilities-api.vercel.app/api/query";
 
   const endpoint = useMemo(() => {
-    if (!apiQueryUrl) return "";
-    // Trim trailing slashes but DO NOT append any paths here
-    return apiQueryUrl.trim().replace(/\/+$/, "");
-  }, [apiQueryUrl]);
+    if (apiProdQueryUrl && apiProdQueryUrl.trim()) {
+      return apiProdQueryUrl.trim().replace(/\/+$/, "");
+    }
+    if (apiBaseUrl && apiBaseUrl.trim()) {
+      return joinUrl(apiBaseUrl.trim(), "api/query");
+    }
+    return hardcoded;
+  }, [apiProdQueryUrl, apiBaseUrl]);
+
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "(ssg)";
 
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<TestResult[]>([]);
 
   async function runAllTests() {
-    if (!endpoint) {
-      setResults([
-        {
-          name: "Config error",
-          ok: false,
-          status: 0,
-          ms: 0,
-          url: "(missing)",
-          responseHeaders: {},
-          raw: "",
-          json: null,
-          error:
-            "customFields.apiQueryUrl is not configured (expected full URL ending with /api/query)",
-        },
-      ]);
-      return;
-    }
-
     setRunning(true);
     setResults([]);
 
     const next: TestResult[] = [];
 
-    // 1) GET health — hits endpoint directly
+    // 1) GET health
     next.push(
       await runFetch("GET (health)", endpoint, {
         method: "GET",
         headers: { Accept: "application/json" },
+        // ✅ Avoid opaque caching surprises
+        cache: "no-store",
       })
     );
     setResults([...next]);
 
-    // 2) POST ping — transport only
+    // 2) POST ping (transport only)
     next.push(
       await runFetch("POST ping (transport only)", endpoint, {
         method: "POST",
         headers: {
+          // ✅ Keep it simple. JSON is fine because our API handles OPTIONS properly.
           "Content-Type": "application/json",
           Accept: "application/json",
         },
         body: JSON.stringify({
           ping: true,
           requestedAt: new Date().toISOString(),
+          origin,
         }),
       })
     );
     setResults([...next]);
 
-    // 3) POST KPI — Databricks roundtrip
+    // 3) POST KPI request
     next.push(
       await runFetch("POST kpi_request.v1 (volume)", endpoint, {
         method: "POST",
@@ -154,7 +157,8 @@ export default function SupportPage() {
   return (
     <AppLayout>
       <SupportUI
-        apiUrl={endpoint || "(missing apiQueryUrl)"}
+        apiUrl={endpoint}
+        origin={origin}
         running={running}
         results={results}
         onRunTests={runAllTests}

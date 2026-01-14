@@ -6,10 +6,15 @@ const config = {
   tagline: "Executive Performance Intelligence",
   favicon: "img/mbmc_favicon.png",
 
-customFields: {
-  apiQueryUrl: "https://ci-capabilities-api.vercel.app/api/query",
-},
-
+  // ✅ Keep this SIMPLE: always call Vercel directly (no dev proxy)
+  // - Localhost + deployed GitHub Pages both work the same
+  // - No Docusaurus devServer schema/proxy quirks
+  customFields: {
+    // Full, explicit endpoint used by Support page (and later hooks)
+    apiProdQueryUrl: "https://ci-capabilities-api.vercel.app/api/query",
+    // Back-compat if any older code still reads this key
+    apiBaseUrl: "https://ci-capabilities-api.vercel.app",
+  },
 
   headTags: [
     {
