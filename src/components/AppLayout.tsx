@@ -17,7 +17,19 @@ export default function AppLayout({
   const barWidth = filtersCollapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED;
 
   const FILTER_LEFT = 30;
-  const TOPBAR_HEIGHT = 64;
+
+  // ====== TOPBAR HEIGHTS (Option B) ======
+  // Expanded header height (your original)
+  const TOPBAR_EXPANDED_HEIGHT = 64;
+
+  // Compact header height (when scrolled)
+  // ✅ adjust this if your compact TopBar ends up slightly different (e.g., 46)
+  const TOPBAR_COMPACT_HEIGHT = 44;
+
+  // ✅ Effective height used to position/center FilterBar in the "safe viewport"
+  const effectiveTopbarHeight = scrolled
+    ? TOPBAR_COMPACT_HEIGHT
+    : TOPBAR_EXPANDED_HEIGHT;
 
   // ====== SCROLL DETECTION ======
   useEffect(() => {
@@ -39,7 +51,7 @@ export default function AppLayout({
         {/* ================= TOP BAR ================= */}
         <TopBar
           visible={!scrolled}
-          height={TOPBAR_HEIGHT}
+          height={TOPBAR_EXPANDED_HEIGHT}
           filterLeft={FILTER_LEFT}
           barWidth={barWidth}
         />
@@ -50,7 +62,7 @@ export default function AppLayout({
           onToggle={() => setFiltersCollapsed((v) => !v)}
           leftOffset={FILTER_LEFT}
           morph={scrolled}
-          topbarHeight={TOPBAR_HEIGHT}
+          topbarHeight={effectiveTopbarHeight}
         />
 
         {/* ================= PAGE CONTENT ================= */}
@@ -59,7 +71,7 @@ export default function AppLayout({
             position: "relative",
             zIndex: 3,
             paddingLeft: FILTER_LEFT + barWidth + 10,
-            paddingTop: TOPBAR_HEIGHT + 16,
+            paddingTop: TOPBAR_EXPANDED_HEIGHT + 16,
             transition: "padding-top 260ms ease",
           }}
         >

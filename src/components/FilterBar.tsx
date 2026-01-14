@@ -10,6 +10,7 @@ import {
   Upload,
   X,
   FileSpreadsheet,
+  Satellite,
 } from "lucide-react";
 
 /* ======================================================
@@ -355,18 +356,24 @@ function UploadModal({
 /* ======================================================
    DROPDOWN
 ====================================================== */
-function Dropdown({
-  label,
-  options,
-}: {
-  label: string;
-  options: string[];
-}) {
+function Dropdown({ label, options }: { label: string; options: string[] }) {
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState(options[0]);
 
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest("[data-dropdown-root]")) return;
+      setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [open]);
+
   return (
-    <div style={{ position: "relative" }}>
+    <div data-dropdown-root style={{ position: "relative" }}>
       <button
         onClick={() => setOpen((o) => !o)}
         style={{
@@ -402,6 +409,7 @@ function Dropdown({
             borderRadius: "7px",
             zIndex: 50,
             boxShadow: "0 14px 30px rgba(0,0,0,0.45)",
+            overflow: "hidden",
           }}
         >
           {options.map((opt) => (
@@ -517,18 +525,15 @@ export default function FilterBar({
   onToggle,
   leftOffset,
   morph = false,
-  topbarHeight = 64,
+  topbarHeight,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   leftOffset?: number;
   morph?: boolean;
-  topbarHeight?: number;
+  topbarHeight: number; // ✅ pass effective height from AppLayout
 }) {
   const bgUrl = useBaseUrl("/img/mbmc_filterbar_bg.png");
-  const logoUrl = useBaseUrl("/img/mbmc_logo.png");
-  const faviconUrl = useBaseUrl("/img/mbmc_favicon.png");
-
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const firstName =
@@ -542,18 +547,22 @@ export default function FilterBar({
   const WIDTH_EXPANDED = 250;
   const width = collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED;
 
-  // ✅ We anchor at left:0 and move via transform so the page width never expands.
   const x = leftOffset ?? INSET_X;
 
-  // Morph positioning
-  const MORPH_TOP = 14;
-  const CENTERED_TOP = "50%";
+  // ✅ Safe-center (always) in the viewport BELOW the TopBar
+  const EDGE_GAP = 14;
+  const safeHeight = `calc(100vh - ${topbarHeight}px - ${EDGE_GAP * 2}px)`;
 
-  const top = morph
-    ? MORPH_TOP
-    : `calc(${CENTERED_TOP} + ${topbarHeight * 0.35}px)`;
+  // One reliable calc: center of safe viewport
+  const top = `calc(
+    ${topbarHeight}px + ${EDGE_GAP}px +
+    (100vh - ${topbarHeight}px - ${EDGE_GAP * 2}px) / 2
+  )`;
 
-  const y = morph ? 0 : -50;
+  const y = -50;
+
+  // ✅ SAME HEIGHT in both states (clamped so it never goes under TopBar)
+  const barHeight = `min(85vh, ${safeHeight})`;
 
   /* ======================================================
      GOLD CTA BUTTON STYLES (Option 2)
@@ -562,28 +571,22 @@ export default function FilterBar({
     () => ({
       position: "relative",
       overflow: "hidden",
-
       width: "100%",
       borderRadius: "20px",
       padding: collapsed ? "0.68rem 0.42rem" : "0.72rem 0.8rem",
       cursor: "pointer",
-
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       gap: collapsed ? 0 : "0.6rem",
-
       background:
         "linear-gradient(180deg, rgba(255,241,186,0.98) 0%, rgba(242,214,117,0.92) 45%, rgba(212,175,55,0.92) 100%)",
-
       border: "1px solid rgba(255,255,255,0.42)",
       boxShadow:
         "inset 0 1px 0 rgba(255,255,255,0.55), " +
         "inset 0 -10px 22px rgba(0,0,0,0.18), " +
         "0 18px 34px rgba(0,0,0,0.40)",
-
       backdropFilter: "blur(6px)",
-
       transition:
         "transform 160ms ease, box-shadow 180ms ease, border 180ms ease, filter 180ms ease",
     }),
@@ -613,28 +616,24 @@ export default function FilterBar({
     el.style.filter = "brightness(1) saturate(1)";
   };
 
-  // ✅ Only show the favicon handoff once TopBar has disappeared
-  const showHandoffFavicon = morph;
-
   return (
     <>
       <aside
         className="filterbar-root"
         style={{
           position: "fixed",
-
           top,
           left: 0,
           transform: `translate3d(${x}px, ${y}%, 0)`,
-          willChange: "transform, width, top",
+          willChange: "transform, width, top, height",
 
           width,
           maxWidth: "calc(100vw - 24px)",
           zIndex: 90,
 
-          height: morph ? "82vh" : "85vh",
+          height: barHeight,
 
-          borderRadius: morph ? "36px" : "50px",
+          borderRadius: "45px",
           boxShadow: morph
             ? "0 26px 60px -20px rgba(0,0,0,0.55)"
             : "0 20px 40px -12px rgba(0,0,0,0.45)",
@@ -646,7 +645,7 @@ export default function FilterBar({
           flexDirection: "column",
 
           transition:
-            "transform 260ms ease, width 260ms ease, top 260ms ease, box-shadow 260ms ease, background-color 260ms ease",
+            "transform 260ms ease, width 260ms ease, top 260ms ease, height 260ms ease, box-shadow 260ms ease, background-color 260ms ease",
         }}
       >
         {/* BACKGROUND */}
@@ -701,70 +700,55 @@ export default function FilterBar({
             minWidth: 0,
           }}
         >
-          {/* ✅ FAVICON HANDOFF (only after TopBar disappears) */}
-          {showHandoffFavicon && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginTop: collapsed ? "0.25rem" : "0.1rem",
-                marginBottom: collapsed ? "-0.15rem" : "-0.25rem",
-                flexShrink: 0,
-              }}
-            >
-              <div
-                style={{
-                  width: collapsed ? 34 : 38,
-                  height: collapsed ? 34 : 38,
-                  borderRadius: 14,
-                  display: "grid",
-                  placeItems: "center",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,0.20), 0 16px 26px rgba(0,0,0,0.25)",
-                  backdropFilter: "blur(6px)",
-                  WebkitBackdropFilter: "blur(6px)",
-                }}
-              >
-                <img
-                  src={faviconUrl}
-                  alt="Mission Control"
-                  style={{
-                    width: collapsed ? 18 : 20,
-                    height: collapsed ? 18 : 20,
-                    opacity: 0.95,
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* LOGO (your existing toggle/float stays exactly the same) */}
+          {/* ✅ MAIN TOGGLE ICON (space-themed) */}
           <div
             className="logo-hover-zone"
             style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              marginTop: showHandoffFavicon ? "0.55rem" : "1.0rem",
+              marginTop: "1.0rem",
               flexShrink: 0,
             }}
           >
             <button
               onClick={onToggle}
               className="logo-float-wrapper"
-              style={{ background: "none", border: "none", padding: 0 }}
+              aria-label="Toggle filters"
+              title="Toggle filters"
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                transition: "transform 160ms ease",
+              }}
             >
-              <img
-                src={logoUrl}
-                alt="Filters"
+              <div
                 className="logo-float"
                 style={{
-                  width: collapsed ? 42 : 100,
-                  transition: "width 220ms ease",
+                  width: collapsed ? 42 : 78,
+                  height: collapsed ? 42 : 78,
+                  borderRadius: 22,
+                  display: "grid",
+                  placeItems: "center",
+                  transition: "width 220ms ease, height 220ms ease",
+
+                  background: "none",
+                  border: "none",
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
                 }}
-              />
+              >
+
+                <Satellite
+                  size={collapsed ? 20 : 30}
+                  color="rgba(247,233,166,0.95)"
+                  style={{
+                    filter: "drop-shadow(0 0 16px rgba(242,214,117,0.26))",
+                  }}
+                />
+              </div>
             </button>
 
             <div className="logo-hover-text">
@@ -901,13 +885,15 @@ export default function FilterBar({
 
           .logo-float {
             animation: zeroGravity 7.5s ease-in-out infinite;
-            filter: drop-shadow(0 0 18px rgba(242,214,117,0.35));
+            filter: drop-shadow(0 0 18px rgba(242,214,117,0.22));
           }
+
           .logo-float-wrapper:hover .logo-float {
             animation-play-state: paused;
-            filter: drop-shadow(0 0 30px rgba(242,214,117,0.6));
-            transform: scale(1.04);
+            filter: drop-shadow(0 0 30px rgba(242,214,117,0.45));
           }
+          .logo-float-wrapper:hover { transform: scale(1.04); }
+
           @keyframes zeroGravity {
             0% { transform: translateY(0px) rotate(0deg); }
             25% { transform: translateY(-4px) rotate(-0.4deg); }
@@ -928,7 +914,6 @@ export default function FilterBar({
           }
           .logo-hover-zone:hover .logo-hover-text { opacity: 0.85; }
 
-          /* ✅ shine sweep for gold CTA */
           .upload-btn:hover .upload-shine { transform: translateX(120%); }
         `}</style>
       </aside>
