@@ -6,10 +6,10 @@ const config = {
   tagline: "Executive Performance Intelligence",
   favicon: "img/mbmc_favicon.png",
 
-  // ✅ MOVE customFields HERE
-  customFields: {
-    apiBaseUrl: "https://ci-capabilities-api.vercel.app",
-  },
+customFields: {
+  apiQueryUrl: "https://ci-capabilities-api.vercel.app/api/query",
+},
+
 
   headTags: [
     {

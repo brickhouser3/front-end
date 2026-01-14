@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
-import { KpiResponseV1 } from "../contracts/kpi";
+import type { ApiQueryResponse } from "../contracts/api";
+import type { ExecKpiValue } from "../contracts/execKpi";
 
 function joinUrl(base: string, path: string) {
   const b = base.replace(/\/+$/, "");
@@ -8,18 +9,13 @@ function joinUrl(base: string, path: string) {
   return `${b}/${p}`;
 }
 
-/**
- * Fetches the Exec Volume KPI from the Vercel API
- * Normalizes Databricks SQL response → KpiResponseV1
- * Uses SIMPLE POST (text/plain) to avoid CORS preflight
- */
 export function useExecVolumeKpi() {
   const { siteConfig } = useDocusaurusContext();
   const apiBaseUrl = (siteConfig.customFields as any)?.apiBaseUrl as
     | string
     | undefined;
 
-  const [data, setData] = useState<KpiResponseV1 | null>(null);
+  const [data, setData] = useState<ExecKpiValue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,15 +33,13 @@ export function useExecVolumeKpi() {
         setLoading(true);
         setError(null);
 
-        // ✅ Always build the correct endpoint
         const url = joinUrl(apiBaseUrl, "api/query");
 
+        // Keep your "simple request" approach if you want:
         const res = await fetch(url, {
           method: "POST",
           headers: {
-            // ✅ SIMPLE REQUEST → no CORS preflight
             "Content-Type": "text/plain",
-            // ✅ Helps proxies/servers return JSON consistently
             Accept: "application/json",
           },
           body: JSON.stringify({
@@ -54,33 +48,30 @@ export function useExecVolumeKpi() {
           }),
         });
 
-        // Try to parse JSON, but don't explode if a proxy returns HTML/text
-        let raw: any = null;
         const text = await res.text();
-        try {
-          raw = text ? JSON.parse(text) : null;
-        } catch {
-          raw = null;
-        }
+        const raw: ApiQueryResponse | null = (() => {
+          try {
+            return text ? JSON.parse(text) : null;
+          } catch {
+            return null;
+          }
+        })();
 
-        // ✅ Prefer API-provided error message if present
         if (!res.ok) {
           const msg =
-            raw?.error ||
-            raw?.message ||
-            (text ? text.slice(0, 160) : `Request failed (${res.status})`);
+            (raw as any)?.error ||
+            (raw as any)?.message ||
+            (text ? text.slice(0, 180) : `Request failed (${res.status})`);
           throw new Error(msg);
         }
 
-        if (raw?.ok === false) {
-          throw new Error(raw?.error ?? "API error");
+        if (!raw || (raw as any).ok === false) {
+          throw new Error((raw as any)?.error ?? "API error");
         }
 
-        const normalized: KpiResponseV1 = {
-          value: raw?.result?.data_array?.[0]?.[0] ?? null,
-        };
+        const value = (raw as any)?.result?.data_array?.[0]?.[0] ?? null;
 
-        if (!cancelled) setData(normalized);
+        if (!cancelled) setData({ value });
       } catch (err: any) {
         if (!cancelled) {
           console.error("❌ useExecVolumeKpi error:", err);
@@ -93,7 +84,6 @@ export function useExecVolumeKpi() {
     }
 
     fetchKpi();
-
     return () => {
       cancelled = true;
     };
