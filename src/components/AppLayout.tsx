@@ -20,11 +20,11 @@ export default function AppLayout({
 
   // ====== TOPBAR HEIGHTS (Option B) ======
   // Expanded header height (your original)
-  const TOPBAR_EXPANDED_HEIGHT = 64;
+  const TOPBAR_EXPANDED_HEIGHT = 50;
 
   // Compact header height (when scrolled)
   // ✅ adjust this if your compact TopBar ends up slightly different (e.g., 46)
-  const TOPBAR_COMPACT_HEIGHT = 44;
+  const TOPBAR_COMPACT_HEIGHT = 40;
 
   // ✅ Effective height used to position/center FilterBar in the "safe viewport"
   const effectiveTopbarHeight = scrolled
