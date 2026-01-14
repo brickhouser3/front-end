@@ -250,7 +250,9 @@ function UploadModal({
                   style={{
                     fontSize: 12,
                     fontWeight: 800,
-                    color: file ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.45)",
+                    color: file
+                      ? "rgba(255,255,255,0.92)"
+                      : "rgba(255,255,255,0.45)",
                     maxWidth: "440px",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -328,8 +330,12 @@ function UploadModal({
                 padding: "10px 14px",
                 borderRadius: 14,
                 border: "1px solid rgba(242,214,117,0.30)",
-                background: file ? "rgba(242,214,117,0.14)" : "rgba(242,214,117,0.06)",
-                color: file ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.45)",
+                background: file
+                  ? "rgba(242,214,117,0.14)"
+                  : "rgba(242,214,117,0.06)",
+                color: file
+                  ? "rgba(255,255,255,0.92)"
+                  : "rgba(255,255,255,0.45)",
                 cursor: file ? "pointer" : "not-allowed",
                 fontWeight: 900,
                 fontSize: 12,
@@ -510,13 +516,18 @@ export default function FilterBar({
   collapsed,
   onToggle,
   leftOffset,
+  morph = false,
+  topbarHeight = 64,
 }: {
   collapsed: boolean;
   onToggle: () => void;
   leftOffset?: number;
+  morph?: boolean;
+  topbarHeight?: number;
 }) {
   const bgUrl = useBaseUrl("/img/mbmc_filterbar_bg.png");
   const logoUrl = useBaseUrl("/img/mbmc_logo.png");
+  const faviconUrl = useBaseUrl("/img/mbmc_favicon.png");
 
   const [uploadOpen, setUploadOpen] = useState(false);
 
@@ -531,14 +542,21 @@ export default function FilterBar({
   const WIDTH_EXPANDED = 250;
   const width = collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED;
 
-  // ✅ We will not use "left: leftOffset" anymore.
-  // We anchor at left:0 and move via transform so the page width never expands.
+  // ✅ We anchor at left:0 and move via transform so the page width never expands.
   const x = leftOffset ?? INSET_X;
+
+  // Morph positioning
+  const MORPH_TOP = 14;
+  const CENTERED_TOP = "50%";
+
+  const top = morph
+    ? MORPH_TOP
+    : `calc(${CENTERED_TOP} + ${topbarHeight * 0.35}px)`;
+
+  const y = morph ? 0 : -50;
 
   /* ======================================================
      GOLD CTA BUTTON STYLES (Option 2)
-     - keep your sizing/spacing behavior
-     - just swap background + text treatment
   ====================================================== */
   const uploadBtn = useMemo<React.CSSProperties>(
     () => ({
@@ -552,10 +570,9 @@ export default function FilterBar({
 
       display: "flex",
       alignItems: "center",
-      justifyContent: "center", // ✅ center always (no right-side text)
+      justifyContent: "center",
       gap: collapsed ? 0 : "0.6rem",
 
-      // ✅ GOLD PILL BASE (premium, readable)
       background:
         "linear-gradient(180deg, rgba(255,241,186,0.98) 0%, rgba(242,214,117,0.92) 45%, rgba(212,175,55,0.92) 100%)",
 
@@ -596,6 +613,9 @@ export default function FilterBar({
     el.style.filter = "brightness(1) saturate(1)";
   };
 
+  // ✅ Only show the favicon handoff once TopBar has disappeared
+  const showHandoffFavicon = morph;
+
   return (
     <>
       <aside
@@ -603,27 +623,30 @@ export default function FilterBar({
         style={{
           position: "fixed",
 
-          // ✅ 85% height, centered vertically
-          height: "85vh",
-          top: "50%",
+          top,
           left: 0,
-          transform: `translate3d(${x}px, -50%, 0)`,
-          willChange: "transform, width",
+          transform: `translate3d(${x}px, ${y}%, 0)`,
+          willChange: "transform, width, top",
 
           width,
-          maxWidth: "calc(100vw - 24px)", // ✅ safety clamp
+          maxWidth: "calc(100vw - 24px)",
           zIndex: 90,
 
-          borderRadius: "50px",
-          boxShadow: "0 20px 40px -12px rgba(0,0,0,0.45)",
+          height: morph ? "82vh" : "85vh",
+
+          borderRadius: morph ? "36px" : "50px",
+          boxShadow: morph
+            ? "0 26px 60px -20px rgba(0,0,0,0.55)"
+            : "0 20px 40px -12px rgba(0,0,0,0.45)",
+
           overflow: "hidden",
-          backgroundColor: "#0b1e3a",
+          backgroundColor: morph ? "rgba(11, 30, 58, 0.86)" : "#0b1e3a",
 
           display: "flex",
           flexDirection: "column",
 
-          // ✅ animate transform+width (not left)
-          transition: "transform 260ms ease, width 260ms ease",
+          transition:
+            "transform 260ms ease, width 260ms ease, top 260ms ease, box-shadow 260ms ease, background-color 260ms ease",
         }}
       >
         {/* BACKGROUND */}
@@ -639,6 +662,24 @@ export default function FilterBar({
           }}
         />
 
+        {/* ✅ optional morph highlight */}
+        {morph && (
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 42,
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.00))",
+              pointerEvents: "none",
+              zIndex: 1,
+            }}
+          />
+        )}
+
         {/* STARS */}
         <div className="stars stars-slow" />
         <div className="stars stars-medium" />
@@ -649,7 +690,7 @@ export default function FilterBar({
           className="scrollbar-hide"
           style={{
             position: "relative",
-            zIndex: 1,
+            zIndex: 2,
             flex: 1,
             overflowY: "auto",
             overflowX: "clip",
@@ -660,14 +701,53 @@ export default function FilterBar({
             minWidth: 0,
           }}
         >
-          {/* LOGO */}
+          {/* ✅ FAVICON HANDOFF (only after TopBar disappears) */}
+          {showHandoffFavicon && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginTop: collapsed ? "0.25rem" : "0.1rem",
+                marginBottom: collapsed ? "-0.15rem" : "-0.25rem",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: collapsed ? 34 : 38,
+                  height: collapsed ? 34 : 38,
+                  borderRadius: 14,
+                  display: "grid",
+                  placeItems: "center",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.20), 0 16px 26px rgba(0,0,0,0.25)",
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
+                }}
+              >
+                <img
+                  src={faviconUrl}
+                  alt="Mission Control"
+                  style={{
+                    width: collapsed ? 18 : 20,
+                    height: collapsed ? 18 : 20,
+                    opacity: 0.95,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* LOGO (your existing toggle/float stays exactly the same) */}
           <div
             className="logo-hover-zone"
             style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              marginTop: "1.0rem",
+              marginTop: showHandoffFavicon ? "0.55rem" : "1.0rem",
               flexShrink: 0,
             }}
           >
@@ -726,7 +806,6 @@ export default function FilterBar({
                 alignItems: "center",
                 gap: collapsed ? 0 : "0.6rem",
 
-                // ✅ dark text for contrast on gold
                 color: "rgba(12, 16, 26, 0.92)",
                 fontFamily: "Inter, system-ui",
                 fontSize: "0.74rem",
@@ -796,62 +875,62 @@ export default function FilterBar({
 
         {/* STYLES */}
         <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-        .stars { position: absolute; inset: 0; pointer-events: none; }
-        .stars-slow {
-          background-image: radial-gradient(1px 6px at 20% 20%, rgba(255,255,255,0.35), transparent),
-                            radial-gradient(1px 6px at 70% 80%, rgba(212,175,55,0.35), transparent);
-          animation: starsRiseSlow 22s linear infinite;
-        }
-        .stars-medium {
-          background-image: radial-gradient(1px 8px at 40% 60%, rgba(255,255,255,0.45), transparent),
-                            radial-gradient(1px 8px at 80% 30%, rgba(212,175,55,0.45), transparent);
-          animation: starsRiseMedium 14s linear infinite;
-        }
-        .stars-fast {
-          background-image: radial-gradient(1px 10px at 55% 40%, rgba(255,255,255,0.6), transparent),
-                            radial-gradient(1px 10px at 90% 70%, rgba(212,175,55,0.6), transparent);
-          animation: starsRiseFast 8s linear infinite;
-        }
+          .stars { position: absolute; inset: 0; pointer-events: none; }
+          .stars-slow {
+            background-image: radial-gradient(1px 6px at 20% 20%, rgba(255,255,255,0.35), transparent),
+                              radial-gradient(1px 6px at 70% 80%, rgba(212,175,55,0.35), transparent);
+            animation: starsRiseSlow 22s linear infinite;
+          }
+          .stars-medium {
+            background-image: radial-gradient(1px 8px at 40% 60%, rgba(255,255,255,0.45), transparent),
+                              radial-gradient(1px 8px at 80% 30%, rgba(212,175,55,0.45), transparent);
+            animation: starsRiseMedium 14s linear infinite;
+          }
+          .stars-fast {
+            background-image: radial-gradient(1px 10px at 55% 40%, rgba(255,255,255,0.6), transparent),
+                              radial-gradient(1px 10px at 90% 70%, rgba(212,175,55,0.6), transparent);
+            animation: starsRiseFast 8s linear infinite;
+          }
 
-        @keyframes starsRiseSlow { to { background-position: 0 -180px; } }
-        @keyframes starsRiseMedium { to { background-position: 0 -320px; } }
-        @keyframes starsRiseFast { to { background-position: 0 -520px; } }
+          @keyframes starsRiseSlow { to { background-position: 0 -180px; } }
+          @keyframes starsRiseMedium { to { background-position: 0 -320px; } }
+          @keyframes starsRiseFast { to { background-position: 0 -520px; } }
 
-        .logo-float {
-          animation: zeroGravity 7.5s ease-in-out infinite;
-          filter: drop-shadow(0 0 18px rgba(242,214,117,0.35));
-        }
-        .logo-float-wrapper:hover .logo-float {
-          animation-play-state: paused;
-          filter: drop-shadow(0 0 30px rgba(242,214,117,0.6));
-          transform: scale(1.04);
-        }
-        @keyframes zeroGravity {
-          0% { transform: translateY(0px) rotate(0deg); }
-          25% { transform: translateY(-4px) rotate(-0.4deg); }
-          50% { transform: translateY(2px) rotate(0.3deg); }
-          75% { transform: translateY(-3px) rotate(-0.2deg); }
-          100% { transform: translateY(0px) rotate(0deg); }
-        }
+          .logo-float {
+            animation: zeroGravity 7.5s ease-in-out infinite;
+            filter: drop-shadow(0 0 18px rgba(242,214,117,0.35));
+          }
+          .logo-float-wrapper:hover .logo-float {
+            animation-play-state: paused;
+            filter: drop-shadow(0 0 30px rgba(242,214,117,0.6));
+            transform: scale(1.04);
+          }
+          @keyframes zeroGravity {
+            0% { transform: translateY(0px) rotate(0deg); }
+            25% { transform: translateY(-4px) rotate(-0.4deg); }
+            50% { transform: translateY(2px) rotate(0.3deg); }
+            75% { transform: translateY(-3px) rotate(-0.2deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+          }
 
-        .logo-hover-text {
-          margin-top: 0.35rem;
-          font-size: 0.55rem;
-          letter-spacing: 0.3em;
-          font-weight: 700;
-          color: #F7E9A6;
-          opacity: 0;
-          transition: opacity 150ms ease;
-          text-transform: uppercase;
-        }
-        .logo-hover-zone:hover .logo-hover-text { opacity: 0.85; }
+          .logo-hover-text {
+            margin-top: 0.35rem;
+            font-size: 0.55rem;
+            letter-spacing: 0.3em;
+            font-weight: 700;
+            color: #F7E9A6;
+            opacity: 0;
+            transition: opacity 150ms ease;
+            text-transform: uppercase;
+          }
+          .logo-hover-zone:hover .logo-hover-text { opacity: 0.85; }
 
-        /* ✅ shine sweep for gold CTA */
-        .upload-btn:hover .upload-shine { transform: translateX(120%); }
-      `}</style>
+          /* ✅ shine sweep for gold CTA */
+          .upload-btn:hover .upload-shine { transform: translateX(120%); }
+        `}</style>
       </aside>
 
       {/* ✅ Modal outside bar for clean stacking */}

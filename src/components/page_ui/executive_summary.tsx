@@ -50,6 +50,31 @@ const EXEC_UPDATES = [
   },
 ];
 
+const EXEC_DUMMY_SECTIONS = [
+  {
+    title: "Executive Notes",
+    subtitle:
+      "Long-form narrative block to validate scroll behavior and header morph transitions.",
+    bullets: [
+      "This section is intentionally tall to enable page scrolling.",
+      "You should see the TopBar slide away as you scroll down.",
+      "As TopBar disappears, FilterBar should morph to pinned-top behavior.",
+      "Scrolling back to top should return TopBar and revert the handoff.",
+    ],
+  },
+  {
+    title: "Opportunities & Risks",
+    subtitle:
+      "Additional content below the fold to test smoothness and layout stability.",
+    bullets: [
+      "Opportunity: Re-accelerate share in Convenience with targeted display bundles.",
+      "Risk: Regional softness may persist if price gaps widen in key channels.",
+      "Opportunity: Leverage Club strength to support halo effects into Grocery.",
+      "Risk: Execution gains could normalize post-reset without sustained activation.",
+    ],
+  },
+];
+
 /* ======================================================
    PAGE
 ====================================================== */
@@ -133,10 +158,67 @@ export default function ExecutiveSummaryUI() {
         .subtle-scroll:hover::-webkit-scrollbar-thumb {
           background-color: rgba(120,130,150,0.6);
         }
+
+        .exec-section-card{
+          background: rgba(255,255,255,0.92);
+          border: 1px solid rgba(10,22,51,0.10);
+          border-radius: 16px;
+          box-shadow: 0 10px 24px rgba(10,22,51,0.10);
+          padding: 1.25rem;
+          min-width: 0;
+        }
+        .exec-section-title{
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          font-size: 0.92rem;
+        }
+        .exec-section-subtitle{
+          margin-top: 6px;
+          opacity: 0.70;
+          font-size: 0.85rem;
+          max-width: 980px;
+        }
+        .exec-section-body{
+          margin-top: 14px;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+          gap: 1rem;
+        }
+        .exec-note{
+          border-radius: 14px;
+          border: 1px solid rgba(10,22,51,0.08);
+          background: rgba(247,249,252,0.85);
+          padding: 0.95rem 1rem;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+          min-height: 240px;
+        }
+        .exec-note ul{
+          margin: 0.6rem 0 0 1rem;
+          padding: 0;
+        }
+        .exec-note li{
+          margin: 0.35rem 0;
+          opacity: 0.88;
+          font-size: 0.86rem;
+          line-height: 1.35;
+        }
+        .exec-filler{
+          height: 320px;
+          border-radius: 14px;
+          border: 1px dashed rgba(10,22,51,0.14);
+          background: linear-gradient(180deg, rgba(10,22,51,0.03), rgba(10,22,51,0.01));
+          display: grid;
+          place-items: center;
+          opacity: 0.75;
+          font-weight: 800;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          font-size: 0.72rem;
+        }
       `}</style>
 
-      {/* ✅ Let AppLayout control page scroll/height.
-          ✅ Clamp horizontal overflow at the Exec scope. */}
+      {/* ✅ This wrapper ensures we can exceed viewport height. */}
       <div
         className="exec-scope"
         style={{
@@ -150,8 +232,8 @@ export default function ExecutiveSummaryUI() {
             width: "100%",
             display: "flex",
             flexDirection: "column",
-            gap: "1.15rem",          // ✅ tightened overall vertical rhythm
-            padding: "0.9rem 1rem",  // ✅ reduced outer canvas padding (biggest gap shrink)
+            gap: "1.15rem",
+            padding: "0.9rem 1rem",
             minWidth: 0,
           }}
         >
@@ -190,7 +272,7 @@ export default function ExecutiveSummaryUI() {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-              gap: "1.05rem", // ✅ slightly tighter KPI spacing
+              gap: "1.05rem",
               minWidth: 0,
             }}
           >
@@ -360,6 +442,53 @@ export default function ExecutiveSummaryUI() {
               >
                 <BrandMatrix selectedMetric={activeMetric} />
               </div>
+            </div>
+          </div>
+
+          {/* ✅ Dummy sections */}
+          {EXEC_DUMMY_SECTIONS.map((sec) => (
+            <div key={sec.title} className="exec-section-card">
+              <div className="exec-section-title">{sec.title}</div>
+              <div className="exec-section-subtitle">{sec.subtitle}</div>
+
+              <div className="exec-section-body">
+                <div className="exec-note">
+                  <div style={{ fontWeight: 900, letterSpacing: "0.10em" }}>
+                    Summary
+                  </div>
+                  <ul>
+                    {sec.bullets.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="exec-filler">Additional content</div>
+              </div>
+            </div>
+          ))}
+
+          {/* ✅ GUARANTEED scroll spacer for debugging */}
+          <div
+            style={{
+              height: 1200,
+              borderRadius: 16,
+              border: "1px dashed rgba(10,22,51,0.25)",
+              background: "rgba(255,255,255,0.55)",
+              display: "grid",
+              placeItems: "center",
+              opacity: 0.85,
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 900,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                fontSize: "0.78rem",
+              }}
+            >
+              Scroll Test Spacer (remove after validation)
             </div>
           </div>
         </div>

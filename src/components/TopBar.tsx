@@ -1,76 +1,116 @@
 import React from "react";
+import useBaseUrl from "@docusaurus/useBaseUrl";
 
-type TopBarProps = {
-  leftOffset: number; // contentLeft
+export default function TopBar({
+  visible = true,
+  height = 64,
+
+  // where the FilterBar sits (same x you pass to FilterBar via leftOffset)
+  filterLeft = 30,
+
+  // current FilterBar width (58 when collapsed, 250 when expanded)
+  barWidth = 250,
+
+  // ✅ stable lockup width so it never jumps when barWidth shrinks
+  lockupWidth = 250,
+}: {
+  visible?: boolean;
   height?: number;
-};
+  filterLeft?: number;
+  barWidth?: number;
+  lockupWidth?: number;
+}) {
+  const faviconUrl = useBaseUrl("/img/mbmc_favicon.png");
 
-const PAGES = ["SUMMARY", "DIAGNOSTIC", "BUILDER", "TARGETS", "SUPPORT"] as const;
+  // ✅ center the lockup over the bar WHEN possible,
+  // but never let it shift left offscreen when the bar collapses.
+  const centerOffset = (barWidth - lockupWidth) / 2; // negative when collapsed
+  const lockupLeft = filterLeft + Math.max(0, centerOffset);
 
-export default function TopBar({ leftOffset, height = 50 }: TopBarProps) {
   return (
     <div
       style={{
         position: "fixed",
         top: 0,
-        left: leftOffset,
+        left: 0,
         right: 0,
-        height,
-        zIndex: 5,
-        pointerEvents: "none",
+        zIndex: 200,
+
+        transform: visible ? "translateY(0)" : "translateY(-110%)",
+        opacity: visible ? 1 : 0,
+        transition: "transform 320ms ease, opacity 220ms ease",
+        pointerEvents: visible ? "auto" : "none",
       }}
     >
-      <nav
-        aria-label="App pages"
+      <div
         style={{
           height,
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          borderBottom: "1px solid rgba(15, 23, 42, 0.10)",
+          boxShadow: "0 10px 24px rgba(15,23,42,0.06)",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center", // ✅ center within content pane
-          gap: 22,
-          pointerEvents: "auto",
-          userSelect: "none",
-          fontFamily:
-            "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          position: "relative",
         }}
       >
-        {PAGES.map((label) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => {
-              console.log("Navigate:", label);
-            }}
+        {/* ✅ Brand lockup positioned above FilterBar, stable width (no jump) */}
+        <div
+          style={{
+            position: "absolute",
+            left: lockupLeft,
+            width: lockupWidth,
+
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+
+            paddingLeft: 6,
+            paddingRight: 6,
+
+            // ✅ ensure it never causes horizontal scroll
+            maxWidth: "calc(100vw - 24px)",
+          }}
+        >
+          <div
             style={{
-              background: "transparent",
-              border: "none",
-              padding: "8px 12px",
-              cursor: "pointer",
-
-              /* typography */
-              fontSize: 8,
-              fontWeight: 400,
-              letterSpacing: "0.08em",
-
-              /* color */
-              color: "rgba(75, 85, 99, 0.95)",
-
-              borderRadius: 10,
-              transition: "background 140ms ease, color 140ms ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.55)";
-              e.currentTarget.style.color = "rgba(55, 65, 81, 1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "rgba(75, 85, 99, 0.95)";
+              width: 34,
+              height: 34,
+              borderRadius: 12,
+              display: "grid",
+              placeItems: "center",
+              background: "rgba(15,23,42,0.04)",
+              border: "1px solid rgba(15,23,42,0.10)",
+              boxShadow: "0 10px 18px rgba(15,23,42,0.06)",
+              flexShrink: 0,
             }}
           >
-            {label}
-          </button>
-        ))}
-      </nav>
+            <img
+              src={faviconUrl}
+              alt="Mission Control"
+              style={{ width: 20, height: 20, opacity: 0.95 }}
+            />
+          </div>
+
+          <div
+            style={{
+              fontFamily: "Spantaran, Inter, system-ui",
+              fontSize: 18,
+              letterSpacing: "0.14em",
+              fontWeight: 800,
+              color: "rgba(15,23,42,0.86)",
+              textTransform: "uppercase",
+              lineHeight: 1,
+              userSelect: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Mission Control
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

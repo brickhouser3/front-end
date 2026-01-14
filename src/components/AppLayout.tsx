@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import FilterBar from "./FilterBar";
-import { UserProvider } from "../context/UserContext";
 import TopBar from "./TopBar";
+import { UserProvider } from "../context/UserContext";
 
 export default function AppLayout({
   children,
@@ -9,18 +9,26 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  // Keep in sync with FilterBar
+  // ====== FILTER BAR DIMENSIONS (single source of truth) ======
   const WIDTH_EXPANDED = 250;
   const WIDTH_COLLAPSED = 58;
-
   const barWidth = filtersCollapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED;
 
-  const OUTER_GAP = 30; // window → bar
-  const INNER_GAP = 10; // bar → content
+  const FILTER_LEFT = 30;
+  const TOPBAR_HEIGHT = 64;
 
-  const filterLeft = OUTER_GAP;
-  const contentLeft = filterLeft + barWidth + INNER_GAP;
+  // ====== SCROLL DETECTION ======
+  useEffect(() => {
+    const onScroll = () => {
+      setScrolled(window.scrollY > 24);
+    };
+
+    onScroll(); // initialize
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <UserProvider>
@@ -28,44 +36,34 @@ export default function AppLayout({
         className="min-h-screen w-full font-sans text-slate-900"
         style={{ position: "relative", overflowX: "hidden" }}
       >
-        {/* ✅ LUNAR BACKGROUND (behind everything) */}
-        <div aria-hidden className="mc-lunar-bg" />
-
-        {/* Rail tint: ends exactly at the content band start */}
-        <div
-          aria-hidden
-          style={{
-            position: "fixed",
-            top: 0,
-            bottom: 0,
-            left: 0,
-            width: contentLeft,
-            pointerEvents: "none",
-            background:
-              "linear-gradient(90deg, rgba(11,30,58,0.08) 0%, rgba(11,30,58,0.045) 55%, rgba(11,30,58,0.00) 100%)",
-            zIndex: 2, // ✅ above lunar layers
-          }}
+        {/* ================= TOP BAR ================= */}
+        <TopBar
+          visible={!scrolled}
+          height={TOPBAR_HEIGHT}
+          filterLeft={FILTER_LEFT}
+          barWidth={barWidth}
         />
 
-        <TopBar leftOffset={contentLeft} />
-
-        {/* Filter (unchanged — keep collapse working) */}
+        {/* ================= FILTER BAR ================= */}
         <FilterBar
           collapsed={filtersCollapsed}
-          onToggle={() => setFiltersCollapsed((c) => !c)}
-          leftOffset={filterLeft}
+          onToggle={() => setFiltersCollapsed((v) => !v)}
+          leftOffset={FILTER_LEFT}
+          morph={scrolled}
+          topbarHeight={TOPBAR_HEIGHT}
         />
 
-        {/* Content */}
+        {/* ================= PAGE CONTENT ================= */}
         <main
           style={{
             position: "relative",
             zIndex: 3,
-            paddingLeft: contentLeft,
-            paddingTop: 25,
+            paddingLeft: FILTER_LEFT + barWidth + 10,
+            paddingTop: TOPBAR_HEIGHT + 16,
+            transition: "padding-top 260ms ease",
           }}
         >
-          <div style={{ padding: "14px 16px" }}>{children}</div>
+          {children}
         </main>
       </div>
     </UserProvider>
