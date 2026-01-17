@@ -4,9 +4,11 @@ import useBaseUrl from "@docusaurus/useBaseUrl";
 import { useLocation } from "@docusaurus/router";
 import { useDashboard, BRAND_CODES } from "../context/DashboardContext"; 
 import { useFilterOptions } from "../hooks/useFilterOptions"; 
-import { ChevronDown, Calendar, Package, ToggleLeft, ToggleRight, Filter, Map, MapPin, Store, ShoppingCart, Check, Clock } from "lucide-react";
+import { 
+    ChevronDown, Calendar, Package, ToggleLeft, ToggleRight, 
+    Filter, Map, MapPin, Store, ShoppingCart, Check
+} from "lucide-react";
 
-// ... (Keep TopBarDropdown component exactly as it was) ...
 /* ================= MULTI-SELECT DROPDOWN ================= */
 function TopBarDropdown({ label, icon: Icon, options, value, onChange, compact, loading, multi }: any) {
   const [open, setOpen] = useState(false);
@@ -120,9 +122,15 @@ export default function TopBar({ visible = true, height = 64 }: { visible?: bool
   const { pathname } = useLocation();
   const compact = !visible;
 
-  // ✅ Consume new includeAO state
-  const { selectedPeriod, setSelectedPeriod, updateFilter, filters, timeScope, setTimeScope, includeAO, setIncludeAO } = useDashboard();
+  // ✅ CONTEXT CONSUMPTION
+  const { 
+      selectedPeriod, setSelectedPeriod, 
+      updateFilter, filters, 
+      timeScope, setTimeScope, 
+      includeAO, setIncludeAO // New Context Items
+  } = useDashboard();
 
+  // Fetch Options
   const { options: regionOptions, loading: regLoad } = useFilterOptions("sls_regn_cd", "mbmc_actuals_volume");
   const { options: stateOptions, loading: stLoad } = useFilterOptions("mktng_st_cd", "mbmc_actuals_volume");
   const { options: wholesalerOptions, loading: wslrLoad } = useFilterOptions("wslr_nbr", "mbmc_actuals_volume");
@@ -146,8 +154,10 @@ export default function TopBar({ visible = true, height = 64 }: { visible?: bool
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 200, height: compact ? 48 : height, transition: "height 0.2s ease" }}>
+      {/* Background */}
       <div style={{ position: "absolute", inset: 0, zIndex: 1, background: compact ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.98)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(15, 23, 42, 0.10)", boxShadow: compact ? "0 4px 10px rgba(0,0,0,0.05)" : "0 10px 24px rgba(0,0,0,0.06)" }} />
 
+      {/* Content */}
       <div style={{ position: "relative", zIndex: 2, height: "100%", width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 24, paddingLeft: 14 }}>
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <img src={faviconUrl} alt="MC" style={{ width: compact ? 24 : 28, height: compact ? 24 : 28, opacity: 0.95 }} />
@@ -165,14 +175,14 @@ export default function TopBar({ visible = true, height = 64 }: { visible?: bool
                 {!compact && <span style={{fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.05em", color: "#94a3b8"}}>GLOBAL:</span>}
             </div>
 
-            {/* ✅ PRODUCT TOGGLE (Core vs +AO) */}
+            {/* ✅ PRODUCT TOGGLE: Core vs +AO */}
             <div onClick={() => setIncludeAO(!includeAO)} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: compact ? "4px 8px" : "6px 12px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", userSelect: "none" }}>
                 <span style={{fontSize: "0.75rem", fontWeight: 700, color: !includeAO ? "#0f172a" : "#94a3b8"}}>Core</span>
                 {!includeAO ? <ToggleLeft size={20} className="text-slate-400"/> : <ToggleRight size={20} className="text-blue-600"/>}
                 <span style={{fontSize: "0.75rem", fontWeight: 700, color: includeAO ? "#0f172a" : "#94a3b8"}}>+ AO</span>
             </div>
 
-            {/* TIME TOGGLE */}
+            {/* ✅ TIME TOGGLE: MTD vs YTD */}
             <div onClick={() => setTimeScope(timeScope === "MTD" ? "YTD" : "MTD")} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: compact ? "4px 8px" : "6px 12px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", userSelect: "none" }}>
                 <span style={{fontSize: "0.75rem", fontWeight: 700, color: timeScope === "MTD" ? "#0f172a" : "#94a3b8"}}>MTD</span>
                 {timeScope === "MTD" ? <ToggleLeft size={20} className="text-slate-400"/> : <ToggleRight size={20} className="text-blue-600"/>}
@@ -180,6 +190,7 @@ export default function TopBar({ visible = true, height = 64 }: { visible?: bool
             </div>
 
             <TopBarDropdown label="Periods" icon={Calendar} options={monthOptions} value={selectedPeriod} onChange={setSelectedPeriod} compact={compact} multi={true} />
+
             <TopBarDropdown label="Region" icon={Map} options={regionOptions} loading={regLoad} value={getVal("sls_regn_cd")} onChange={(v: string) => updateFilter("sls_regn_cd", v)} compact={compact} />
             <TopBarDropdown label="State" icon={MapPin} options={stateOptions} loading={stLoad} value={getVal("mktng_st_cd")} onChange={(v: string) => updateFilter("mktng_st_cd", v)} compact={compact} />
             <TopBarDropdown label="Wholesaler" icon={Store} options={wholesalerOptions} loading={wslrLoad} value={getVal("wslr_nbr")} onChange={(v: string) => updateFilter("wslr_nbr", v)} compact={compact} />

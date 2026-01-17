@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 import { BarChart3, DollarSign, Percent, MapPin, Droplet, LayoutGrid, Gauge, Megaphone, ChevronRight, Layers } from "lucide-react";
 import { useDashboard, BRAND_CODES } from "../context/DashboardContext";
@@ -35,8 +35,8 @@ const getAnchorMonth = (periods: string[]) => {
     return [...periods].sort().reverse()[0];
 };
 
-const BRAND_COLS = ["BDL", "BHL", "MUL", "BUD", "STA", "NUTRL", "KGA", "CWFM"];
-const BRAND_LOGOS: Record<string, string> = { "BDL": "BDL.jpg", "BHL": "BHL.jpg", "MUL": "MUL.jpg", "BUD": "BUD.jpg", "STA": "STA.jpg", "NUTRL": "NUTRL.png", "KGA": "KGA.png", "CWFM": "CWFM.jpg" };
+const BRAND_LOGOS: Record<string, string> = { "BDL": "BDL.jpg", "BHL": "BHL.jpg", "MUL": "MUL.jpg", "BUD": "BUD.jpg", "STA": "STA.jpg", "NUTRL": "NUTRL.png", "KGA": "KGA.png", "CWFM": "CWFM.jpg", "AO": "AO_logo_placeholder.png" }; // Placeholder for AO logo if missing
+
 const KPI_CONFIG = [
   { key: "volume", label: "Volume", icon: BarChart3 }, { key: "revenue", label: "Net Rev", icon: DollarSign },
   { key: "share", label: "Share", icon: Percent }, { key: "adshare", label: "Ad Share", icon: Megaphone },
@@ -44,12 +44,11 @@ const KPI_CONFIG = [
   { key: "avd", label: "AVD", icon: Gauge }, { key: "displays", label: "Displays", icon: LayoutGrid },
 ];
 
-const GRID = `115px repeat(${BRAND_COLS.length}, minmax(60px, 1fr)) 80px`; 
 const columnCellStyle: React.CSSProperties = { width: "100%", minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1.15 };
 
 // --- SUB-LEVEL RENDERER ---
-const DrillLevel = ({ kpi, groupBy, parentFilters }: any) => {
-    const { filters, selectedPeriod, timeScope, includeAO } = useDashboard(); // ✅ AO
+const DrillLevel = ({ kpi, groupBy, parentFilters, activeBrandCols, gridLayout }: any) => {
+    const { filters, selectedPeriod, timeScope, includeAO } = useDashboard();
     const [rows, setRows] = useState<{name: string, data: number[]}[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -58,7 +57,11 @@ const DrillLevel = ({ kpi, groupBy, parentFilters }: any) => {
         const fetchData = async (brandFilter?: string) => {
             const anchor = getAnchorMonth(selectedPeriod);
             const body: any = { 
-                contract_version: "kpi_request.v1", kpi, groupBy, max_month: anchor, scope: timeScope, 
+                contract_version: "kpi_request.v1", 
+                kpi, 
+                groupBy, 
+                max_month: anchor, 
+                scope: timeScope, 
                 filters: { ...filters, ...parentFilters, include_ao: includeAO } 
             };
             if(brandFilter) body.filters.megabrand = [brandFilter];
@@ -74,25 +77,25 @@ const DrillLevel = ({ kpi, groupBy, parentFilters }: any) => {
 
         const load = async () => {
             setLoading(true);
-            const brandMaps = await Promise.all(BRAND_COLS.map(b => fetchData(b)));
+            const brandMaps = await Promise.all(activeBrandCols.map((b: string) => fetchData(b)));
             const totalMap = await fetchData(); 
 
             if (!mounted) return;
 
             const allKeys = new Set(Object.keys(totalMap));
-            BRAND_COLS.forEach((_, i) => Object.keys(brandMaps[i]).forEach(k => allKeys.add(k)));
+            activeBrandCols.forEach((_, i) => Object.keys(brandMaps[i]).forEach(k => allKeys.add(k)));
 
             const isAdditive = ADDITIVE_KPIS.includes(kpi);
 
             const finalRows = Array.from(allKeys).map(key => {
                 let rowSum = 0;
-                const colValues = BRAND_COLS.map((_, i) => {
+                const colValues = activeBrandCols.map((_, i) => {
                     const val = brandMaps[i][key] || 0;
                     rowSum += val;
                     return val;
                 });
 
-                // ✅ HYBRID TOTAL LOGIC (Sum Additive, API for Others)
+                // HYBRID TOTAL
                 const totalVal = isAdditive ? rowSum : (totalMap[key] || 0);
                 
                 colValues.push(totalVal);
@@ -104,14 +107,14 @@ const DrillLevel = ({ kpi, groupBy, parentFilters }: any) => {
         };
         load();
         return () => { mounted = false; };
-    }, [kpi, groupBy, JSON.stringify(selectedPeriod), timeScope, JSON.stringify(filters), includeAO]);
+    }, [kpi, groupBy, JSON.stringify(selectedPeriod), timeScope, JSON.stringify(filters), includeAO, activeBrandCols]);
 
     if (loading) return <div style={{ padding: "8px 0 8px 40px", fontSize: "0.7rem", color: "#94a3b8" }}>Loading details...</div>;
 
     return (
         <div style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
             {rows.map((r, idx) => (
-                <div key={idx} style={{ display: "grid", gridTemplateColumns: GRID, gap: 4, padding: "6px 0", borderTop: idx===0 ? "none" : "1px dashed #e2e8f0" }}>
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: gridLayout, gap: 4, padding: "6px 0", borderTop: idx===0 ? "none" : "1px dashed #e2e8f0" }}>
                     <div style={{ paddingLeft: 40, fontSize: "0.75rem", color: "#64748b", fontWeight: 500 }}>{r.name}</div>
                     {r.data.map((val, i) => (
                         <div key={i} style={{ textAlign: "center", fontSize: "0.75rem", color: "#64748b" }}>{formatValue(val, kpi)}</div>
@@ -124,12 +127,24 @@ const DrillLevel = ({ kpi, groupBy, parentFilters }: any) => {
 
 /* ================= MAIN COMPONENT ================= */
 export default function BrandMatrix({ selectedMetric }: BrandMatrixProps) {
-  const { filters, selectedPeriod, timeScope, includeAO } = useDashboard(); // ✅ AO
+  const { filters, selectedPeriod, timeScope, includeAO } = useDashboard(); // ✅ includeAO
   const drill = useDrillState();
   const baseUrl = useBaseUrl("/");
   const [drillLevel, setDrillLevel] = useState("region");
   const [kpiRows, setKpiRows] = useState<Record<string, number[]>>({});
   const [loading, setLoading] = useState(true);
+
+  // ✅ DYNAMIC COLUMNS (Include AO if toggled)
+  const activeBrandCols = useMemo(() => {
+      const base = ["BDL", "BHL", "MUL", "BUD", "STA", "NUTRL", "KGA", "CWFM"];
+      if (includeAO) base.push("AO");
+      return base;
+  }, [includeAO]);
+
+  // ✅ DYNAMIC GRID
+  const gridLayout = useMemo(() => 
+      `115px repeat(${activeBrandCols.length}, minmax(60px, 1fr)) 75px`, 
+  [activeBrandCols]);
 
   useEffect(() => {
       let mounted = true;
@@ -153,9 +168,9 @@ export default function BrandMatrix({ selectedMetric }: BrandMatrixProps) {
                  const brandMap: Record<string, number> = {};
                  if(jsonBrand.ok) jsonBrand.result.data_array.forEach((r: string[]) => brandMap[r[0]] = parseFloat(r[1]));
                  
-                 const rowData = BRAND_COLS.map(b => brandMap[b] || 0);
+                 const rowData = activeBrandCols.map(b => brandMap[b] || 0);
 
-                 // ✅ HYBRID TOTAL LOGIC (Match Drill Logic)
+                 // HYBRID TOTAL
                  let grandTotal = 0;
                  if (ADDITIVE_KPIS.includes(kpi)) {
                      grandTotal = rowData.reduce((sum, val) => sum + val, 0);
@@ -175,7 +190,7 @@ export default function BrandMatrix({ selectedMetric }: BrandMatrixProps) {
       };
       fetchTopLevel();
       return () => { mounted = false; };
-  }, [JSON.stringify(selectedPeriod), timeScope, JSON.stringify(filters), includeAO]);
+  }, [JSON.stringify(selectedPeriod), timeScope, JSON.stringify(filters), includeAO, activeBrandCols]);
 
   return (
     <div style={{ padding: "0.5rem", height: "100%", display: "flex", flexDirection: "column", fontFamily: "Inter, sans-serif", overflowX: "auto" }}>
@@ -194,11 +209,15 @@ export default function BrandMatrix({ selectedMetric }: BrandMatrixProps) {
         </div>
 
         {/* HEADERS */}
-        <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 4, padding: "8px 0", borderBottom: "2px solid #e2e8f0", alignItems: "end", background: "white", position: "sticky", top: 0, zIndex: 10, minWidth: "fit-content" }}>
+        <div style={{ display: "grid", gridTemplateColumns: gridLayout, gap: 4, padding: "8px 0", borderBottom: "2px solid #e2e8f0", alignItems: "end", background: "white", position: "sticky", top: 0, zIndex: 10, minWidth: "fit-content" }}>
             <div style={{fontWeight: 700, fontSize: "0.7rem", color: "#94a3b8", paddingLeft: 8}}>METRIC / DRILL</div>
-            {BRAND_COLS.map(b => (
+            {activeBrandCols.map(b => (
                 <div key={b} style={{ display: "flex", justifyContent: "center" }}>
-                    <img src={`${baseUrl}img/brand_logos/${BRAND_LOGOS[b]}`} style={{ height: 28, objectFit: "contain" }} alt={b} />
+                    {BRAND_LOGOS[b] ? (
+                        <img src={`${baseUrl}img/brand_logos/${BRAND_LOGOS[b]}`} style={{ height: 28, objectFit: "contain" }} alt={b} />
+                    ) : (
+                        <span style={{fontSize: "0.8rem", fontWeight: 700, color: "#475569"}}>{b}</span>
+                    )}
                 </div>
             ))}
             <div style={{ fontWeight: 800, textAlign: "center", fontSize: "0.75rem", color: "#1e293b" }}>TOTAL</div>
@@ -211,7 +230,7 @@ export default function BrandMatrix({ selectedMetric }: BrandMatrixProps) {
                 const isExpanded = drill.isOpen(kpi.key);
                 return (
                     <React.Fragment key={kpi.key}>
-                        <div onClick={() => drill.toggle(kpi.key)} style={{ display: "grid", gridTemplateColumns: GRID, gap: 4, padding: "10px 0", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isExpanded ? "#f1f5f9" : "white" }}>
+                        <div onClick={() => drill.toggle(kpi.key)} style={{ display: "grid", gridTemplateColumns: gridLayout, gap: 4, padding: "10px 0", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isExpanded ? "#f1f5f9" : "white" }}>
                             <div style={{ paddingLeft: 8, fontWeight: 700, fontSize: "0.8rem", color: "#334155", display: "flex", alignItems: "center", gap: 8 }}>
                                 <ChevronRight size={14} style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
                                 <div style={{display: "flex", alignItems: "center", gap: 6}}><kpi.icon size={14} className="text-slate-400" />{kpi.label}</div>
@@ -222,7 +241,7 @@ export default function BrandMatrix({ selectedMetric }: BrandMatrixProps) {
                                 </div>
                             ))}
                         </div>
-                        {isExpanded && <DrillLevel kpi={kpi.key} groupBy={drillLevel} parentFilters={{}} />}
+                        {isExpanded && <DrillLevel kpi={kpi.key} groupBy={drillLevel} parentFilters={{}} activeBrandCols={activeBrandCols} gridLayout={gridLayout} />}
                     </React.Fragment>
                 );
             })}

@@ -6,7 +6,6 @@ const GEO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
 const FIPS_TO_STATE: Record<string, string> = { "01": "AL","02": "AK","04": "AZ","05": "AR","06": "CA","08": "CO","09": "CT","10": "DE", "11": "DC","12": "FL","13": "GA","15": "HI","16": "ID","17": "IL","18": "IN","19": "IA", "20": "KS","21": "KY","22": "LA","23": "ME","24": "MD","25": "MA","26": "MI","27": "MN", "28": "MS","29": "MO","30": "MT","31": "NE","32": "NV","33": "NH","34": "NJ","35": "NM", "36": "NY","37": "NC","38": "ND","39": "OH","40": "OK","41": "OR","42": "PA","44": "RI", "45": "SC","46": "SD","47": "TN","48": "TX","49": "UT","50": "VT","51": "VA","53": "WA", "54": "WV","55": "WI","56": "WY" };
 const KPI_LABELS = { volume: "Vol", revenue: "Rev", share: "Share", adshare: "AdSh", pods: "PODs", taps: "TAPs", avd: "AVD", displays: "Disp" };
 
-// ✅ SMART FORMATTER
 const formatValue = (val: number, kpiKey: string) => {
     if (val === 0 || isNaN(val)) return "-";
     const abs = Math.abs(val);
@@ -126,7 +125,7 @@ export default function USHeatmap({ onSelectState }: { onSelectState?: (state: s
     <div style={{ width: "100%", height: "160px", marginBottom: "1.5rem", padding: "0.5rem", fontFamily: "Inter, sans-serif", position: "relative", boxSizing: "border-box" }}>
       <div style={{ display: "flex", height: "100%", gap: "1.5rem", alignItems: "flex-start" }}>
         
-        {/* === LEFT: MAP === */}
+        {/* LEFT: MAP */}
         <div style={{ flex: "0 0 250px", height: "100%", display: "flex", alignItems: "center", justifyContent: "flex-start" }}> 
            <div style={{ width: "100%", height: "100%" }}>
             <ComposableMap projection="geoAlbersUsa" style={{ width: "100%", height: "100%" }}>
@@ -157,7 +156,7 @@ export default function USHeatmap({ onSelectState }: { onSelectState?: (state: s
            </div>
         </div>
 
-        {/* === RIGHT: SCORECARD === */}
+        {/* RIGHT: SCORECARD */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.4rem", background: "rgba(255,255,255,0.6)", borderRadius: 12, padding: "8px 12px", border: "1px solid rgba(0,0,0,0.05)" }}>
             <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: 4 }}>
                 <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#1e293b", textTransform: "uppercase" }}>{activeTitle}</div>

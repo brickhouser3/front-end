@@ -12,7 +12,6 @@ type RowData = {
     data: Record<string, { value: number; delta: number }>;
 };
 
-/* ================= LAYOUT CONSTANTS ================= */
 const FIRST_COL_WIDTH = "220px";
 const COLUMN_GAP = "0.4rem";
 const ROW_PADDING_Y = "0.6rem";
@@ -33,29 +32,20 @@ const kpis = [
   { key: "displays", label: "Displays", icon: LayoutGrid },
 ];
 
-const REGION_NAMES: Record<string, string> = { 
-    "01": "Region 1", "02": "Region 2", "03": "Region 3", "04": "Region 4", 
-    "05": "Region 5", "06": "Region 6", "07": "Region 7", "08": "Region 8" 
-};
+const REGION_NAMES: Record<string, string> = { "01": "Region 1", "02": "Region 2", "03": "Region 3", "04": "Region 4", "05": "Region 5", "06": "Region 6", "07": "Region 7", "08": "Region 8" };
 
-/* ================= HELPERS ================= */
-
-// 1. Get Anchor Month
 const getAnchorMonth = (periods: string[]) => {
     if (!periods || periods.length === 0) return "202512";
     return [...periods].sort().reverse()[0];
 };
 
-// 2. Smart Formatting (Consistent with BrandMatrix)
 const formatValue = (val: number, kpiKey: string) => {
     if (val === null || val === undefined || isNaN(val) || val === 0) return "-";
     const abs = Math.abs(val);
 
-    // Percentages & Averages
     if (kpiKey.includes("share") || kpiKey === "adshare") return `${val.toFixed(1)}%`;
     if (kpiKey === "avd") return val.toFixed(1);
 
-    // Revenue
     if (kpiKey === "revenue") {
         if (abs >= 1.0e9) return `$${(val / 1.0e9).toFixed(1)}B`;
         if (abs >= 1.0e6) return `$${(val / 1.0e6).toFixed(1)}M`;
@@ -63,7 +53,6 @@ const formatValue = (val: number, kpiKey: string) => {
         return `$${val.toFixed(0)}`;
     }
 
-    // Counts
     if (abs >= 1.0e9) return `${(val / 1.0e9).toFixed(1)}B`;
     if (abs >= 1.0e6) return `${(val / 1.0e6).toFixed(1)}M`;
     if (abs >= 1.0e3) return `${(val / 1.0e3).toFixed(0)}K`;
@@ -71,10 +60,8 @@ const formatValue = (val: number, kpiKey: string) => {
     return val.toFixed(0);
 };
 
-/* ================= RECURSIVE ROW RENDERER ================= */
 const MatrixLevel = ({ level, groupBy, parentFilters, pathPrefix, drill, selectedMetric, hoverCol, setHoverCol }: any) => {
-    // ✅ Consuming includeAO
-    const { filters: globalFilters, selectedPeriod, timeScope, includeAO } = useDashboard(); 
+    const { filters: globalFilters, selectedPeriod, timeScope, includeAO } = useDashboard(); // ✅ includeAO
     const [rows, setRows] = useState<RowData[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -91,12 +78,8 @@ const MatrixLevel = ({ level, groupBy, parentFilters, pathPrefix, drill, selecte
                         kpi, 
                         groupBy, 
                         max_month: anchor, 
-                        scope: timeScope, // ✅ Respect YTD/MTD
-                        filters: { 
-                            ...globalFilters, 
-                            ...parentFilters,
-                            include_ao: includeAO // ✅ Respect AO Toggle
-                        }
+                        scope: timeScope, 
+                        filters: { ...globalFilters, ...parentFilters, include_ao: includeAO } // ✅ Pass to API
                     })
                 });
                 const json = await res.json();
@@ -114,7 +97,6 @@ const MatrixLevel = ({ level, groupBy, parentFilters, pathPrefix, drill, selecte
             
             if (!mounted) return;
 
-            // Merge Data
             const allKeys = new Set<string>();
             results.forEach(res => Object.keys(res).forEach(k => allKeys.add(k)));
 
@@ -136,7 +118,6 @@ const MatrixLevel = ({ level, groupBy, parentFilters, pathPrefix, drill, selecte
                 };
             });
 
-            // Sort Alphabetically by Name
             setRows(finalRows.sort((a, b) => a.name.localeCompare(b.name)));
             setLoading(false);
         };
@@ -156,7 +137,6 @@ const MatrixLevel = ({ level, groupBy, parentFilters, pathPrefix, drill, selecte
                 
                 return (
                     <React.Fragment key={row.id}>
-                        {/* ROW RENDER */}
                         <div 
                             onClick={() => level !== "wholesaler" && drill.toggle(currentPath)}
                             style={{ 
@@ -185,31 +165,11 @@ const MatrixLevel = ({ level, groupBy, parentFilters, pathPrefix, drill, selecte
                                 );
                             })}
                         </div>
-
-                        {/* RECURSIVE CHILD RENDER */}
                         {isExpanded && level === "region" && (
-                            <MatrixLevel 
-                                level="state" 
-                                groupBy="state" 
-                                parentFilters={{ region: [row.id] }} 
-                                pathPrefix={currentPath} 
-                                drill={drill} 
-                                selectedMetric={selectedMetric}
-                                hoverCol={hoverCol}
-                                setHoverCol={setHoverCol}
-                            />
+                            <MatrixLevel level="state" groupBy="state" parentFilters={{ region: [row.id] }} pathPrefix={currentPath} drill={drill} selectedMetric={selectedMetric} hoverCol={hoverCol} setHoverCol={setHoverCol} />
                         )}
                         {isExpanded && level === "state" && (
-                            <MatrixLevel 
-                                level="wholesaler" 
-                                groupBy="wholesaler" 
-                                parentFilters={{ ...parentFilters, state: [row.id] }} 
-                                pathPrefix={currentPath} 
-                                drill={drill} 
-                                selectedMetric={selectedMetric}
-                                hoverCol={hoverCol}
-                                setHoverCol={setHoverCol}
-                            />
+                            <MatrixLevel level="wholesaler" groupBy="wholesaler" parentFilters={{ ...parentFilters, state: [row.id] }} pathPrefix={currentPath} drill={drill} selectedMetric={selectedMetric} hoverCol={hoverCol} setHoverCol={setHoverCol} />
                         )}
                     </React.Fragment>
                 );
@@ -218,15 +178,12 @@ const MatrixLevel = ({ level, groupBy, parentFilters, pathPrefix, drill, selecte
     );
 };
 
-/* ================= MAIN EXPORT ================= */
 export default function RegionMatrix({ selectedMetric }: RegionMatrixProps) {
   const drill = useDrillState();
   const [hoverCol, setHoverCol] = useState<number | null>(null);
 
   return (
     <div style={{ padding: "0.25rem", fontFamily: "Inter, sans-serif", height: "100%", overflowY: "auto", overflowX: "clip" }}>
-      
-      {/* HEADERS */}
       <div style={{ position: "sticky", top: 0, zIndex: 10, background: "white", borderBottom: "2px solid #e2e8f0" }}>
         <div style={{ display: "grid", gridTemplateColumns: MATRIX_GRID(kpis.length), gap: COLUMN_GAP, padding: `${ROW_PADDING_Y} 0.5rem` }}>
           <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Hierarchy</div>
@@ -240,18 +197,7 @@ export default function RegionMatrix({ selectedMetric }: RegionMatrixProps) {
           ))}
         </div>
       </div>
-
-      {/* TOP LEVEL (REGIONS) */}
-      <MatrixLevel 
-        level="region" 
-        groupBy="region" 
-        parentFilters={{}} 
-        pathPrefix="" 
-        drill={drill} 
-        selectedMetric={selectedMetric} 
-        hoverCol={hoverCol} 
-        setHoverCol={setHoverCol} 
-      />
+      <MatrixLevel level="region" groupBy="region" parentFilters={{}} pathPrefix="" drill={drill} selectedMetric={selectedMetric} hoverCol={hoverCol} setHoverCol={setHoverCol} />
     </div>
   );
 }
