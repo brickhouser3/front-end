@@ -1,268 +1,141 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
-import { statePerformance } from "../lib/mockStatePerformance";
-
-/* ======================================================
-   GEO CONFIG
-====================================================== */
+import { useDashboard } from "../context/DashboardContext"; 
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
+const FIPS_TO_STATE: Record<string, string> = { "01": "AL","02": "AK","04": "AZ","05": "AR","06": "CA","08": "CO","09": "CT","10": "DE", "11": "DC","12": "FL","13": "GA","15": "HI","16": "ID","17": "IL","18": "IN","19": "IA", "20": "KS","21": "KY","22": "LA","23": "ME","24": "MD","25": "MA","26": "MI","27": "MN", "28": "MS","29": "MO","30": "MT","31": "NE","32": "NV","33": "NH","34": "NJ","35": "NM", "36": "NY","37": "NC","38": "ND","39": "OH","40": "OK","41": "OR","42": "PA","44": "RI", "45": "SC","46": "SD","47": "TN","48": "TX","49": "UT","50": "VT","51": "VA","53": "WA", "54": "WV","55": "WI","56": "WY" };
+const KPI_LABELS = { volume: "Vol", revenue: "Rev", share: "Share", adshare: "AdSh", pods: "PODs", taps: "TAPs", avd: "AVD", displays: "Disp" };
 
-const FIPS_TO_STATE: Record<string, string> = {
-  "01": "AL","02": "AK","04": "AZ","05": "AR","06": "CA","08": "CO",
-  "09": "CT","10": "DE","11": "DC","12": "FL","13": "GA","15": "HI",
-  "16": "ID","17": "IL","18": "IN","19": "IA","20": "KS","21": "KY",
-  "22": "LA","23": "ME","24": "MD","25": "MA","26": "MI","27": "MN",
-  "28": "MS","29": "MO","30": "MT","31": "NE","32": "NV","33": "NH",
-  "34": "NJ","35": "NM","36": "NY","37": "NC","38": "ND","39": "OH",
-  "40": "OK","41": "OR","42": "PA","44": "RI","45": "SC","46": "SD",
-  "47": "TN","48": "TX","49": "UT","50": "VT","51": "VA","53": "WA",
-  "54": "WV","55": "WI","56": "WY",
+// ✅ SMART FORMATTER
+const formatValue = (val: number, kpiKey: string) => {
+    if (val === 0 || isNaN(val)) return "-";
+    const abs = Math.abs(val);
+
+    if (kpiKey.includes("share") || kpiKey === "adshare") return `${val.toFixed(1)}%`;
+    if (kpiKey === "avd") return val.toFixed(1);
+
+    if (kpiKey === "revenue") {
+        if (abs >= 1.0e9) return `$${(val / 1.0e9).toFixed(1)}B`;
+        if (abs >= 1.0e6) return `$${(val / 1.0e6).toFixed(1)}M`;
+        if (abs >= 1.0e3) return `$${(val / 1.0e3).toFixed(0)}K`;
+        return `$${val.toFixed(0)}`;
+    }
+
+    if (abs >= 1.0e9) return `${(val / 1.0e9).toFixed(1)}B`;
+    if (abs >= 1.0e6) return `${(val / 1.0e6).toFixed(1)}M`;
+    if (abs >= 1.0e3) return `${(val / 1.0e3).toFixed(0)}K`;
+
+    return val.toFixed(0);
 };
 
-/* ======================================================
-   KPI CONFIG
-====================================================== */
+const getAnchorMonth = (periods: string[]) => {
+    if (!periods || periods.length === 0) return "202512";
+    return [...periods].sort().reverse()[0];
+};
 
-const KPI_ORDER = [
-  "Volume",
-  "Revenue",
-  "Share",
-  "PODs",
-  "TAPs",
-  "Displays",
-  "Ad Share",
-  "Velocity",
-];
+function useFullStateData() {
+    const { filters, selectedPeriod, timeScope, includeAO } = useDashboard(); // ✅ includeAO
+    const [data, setData] = useState<any>({});
+    const [national, setNational] = useState<any>({});
+    const [loading, setLoading] = useState(true);
 
-type KpiMetric = { value: number; target: number };
+    useEffect(() => {
+        let mounted = true;
+        const fetchKpi = async (kpi: string) => {
+            const anchor = getAnchorMonth(selectedPeriod);
+            try {
+                const res = await fetch("https://ci-capabilities-api.vercel.app/api/query", { 
+                    method: "POST", 
+                    headers: { "Content-Type": "application/json" }, 
+                    body: JSON.stringify({ 
+                        contract_version: "kpi_request.v1", 
+                        kpi, 
+                        groupBy: "state", 
+                        max_month: anchor, 
+                        scope: timeScope, 
+                        filters: { 
+                            megabrand: filters.megabrand, 
+                            wholesaler_id: filters.wslr_nbr, 
+                            channel: filters.channel,
+                            include_ao: includeAO // ✅ Pass AO
+                        } 
+                    }) 
+                });
+                const json = await res.json();
+                const result: any = {};
+                if (json.ok) json.result.data_array.forEach((row: string[]) => result[row[0]] = { val: parseFloat(row[1]), ly: parseFloat(row[2]) });
+                return result;
+            } catch { return {}; }
+        };
 
-function getMockMetrics(): Record<string, KpiMetric> {
-  return Object.fromEntries(
-    KPI_ORDER.map((kpi) => [
-      kpi,
-      { value: 96 + Math.round(Math.random() * 10), target: 100 },
-    ])
-  );
+        const load = async () => {
+            setLoading(true);
+            const kpis = Object.keys(KPI_LABELS);
+            const results = await Promise.all(kpis.map(k => fetchKpi(k)));
+            
+            if (mounted) {
+                const merged: any = {};
+                const natAgg: any = {};
+                kpis.forEach(k => natAgg[k] = { val: 0, ly: 0 });
+
+                Object.values(FIPS_TO_STATE).forEach(state => {
+                    merged[state] = {};
+                    kpis.forEach((kpi, i) => {
+                        const raw = results[i][state];
+                        if (raw) {
+                            natAgg[kpi].val += raw.val;
+                            natAgg[kpi].ly += raw.ly;
+                            merged[state][kpi] = raw;
+                        } else {
+                            merged[state][kpi] = { val: 0, ly: 0 };
+                        }
+                    });
+                });
+                
+                if (natAgg['share']) { natAgg['share'].val /= 50; natAgg['share'].ly /= 50; }
+                if (natAgg['adshare']) { natAgg['adshare'].val /= 50; natAgg['adshare'].ly /= 50; }
+                if (natAgg['avd']) { natAgg['avd'].val /= 50; natAgg['avd'].ly /= 50; }
+
+                setData(merged);
+                setNational(natAgg);
+                setLoading(false);
+            }
+        };
+        load();
+        return () => { mounted = false; };
+    }, [JSON.stringify(selectedPeriod), timeScope, JSON.stringify(filters), includeAO]);
+
+    return { data, national, loading };
 }
 
-/* ======================================================
-   COLOR HELPERS
-====================================================== */
-
-function performanceColor(value?: number) {
-  if (typeof value !== "number") return "#e5e7eb";
-  if (value >= 1.05) return "#166534";
-  if (value >= 1.0) return "#22c55e";
-  if (value >= 0.95) return "#ef4444";
-  return "#b91c1c";
+function performanceColor(pct: number) {
+  if (pct >= 0.05) return "#166534"; 
+  if (pct >= 0) return "#4ade80"; 
+  if (pct >= -0.05) return "#f87171"; 
+  return "#991b1b"; 
 }
 
-function deltaColor(delta: number) {
-  if (delta > 0) return "#16a34a";
-  if (delta < 0) return "#dc2626";
-  return "#6b7280";
-}
-
-/* ======================================================
-   COMPONENT
-====================================================== */
-
-export default function USHeatmap({
-  onSelectState,
-}: {
-  onSelectState?: (state: string) => void;
-}) {
+export default function USHeatmap({ onSelectState }: { onSelectState?: (state: string) => void }) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
-  const metrics = hoveredState ? getMockMetrics() : null;
+  const { data, national, loading } = useFullStateData();
+
+  const activeData = hoveredState ? data[hoveredState] : national;
+  const activeTitle = hoveredState ? `${hoveredState} Scorecard` : "National Total";
 
   return (
-    <div
-      style={{
-        width: "100%",
-        height: "170px",
-        padding: "0.75rem",
-        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-        position: "relative",
-        boxSizing: "border-box",
-        minWidth: 0,
-        overflowX: "clip", // ✅ prevents phantom horizontal spill
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          height: "100%",
-          gap: "1rem",
-          alignItems: "flex-start",
-          minWidth: 0, // ✅ key
-        }}
-      >
-        {/* ================= LEFT ================= */}
-        <div
-          style={{
-            // ✅ responsive instead of forcing 280px
-            flex: "0 1 280px",
-            minWidth: 220,
-            maxWidth: 320,
-            minHeight: 0,
-            minWidth: 0,
-          }}
-        >
-          {/* Title */}
-          <div style={{ display: "flex", gap: "0.75rem", minWidth: 0 }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background:
-                  "linear-gradient(135deg, rgba(59,130,246,0.18), rgba(99,102,241,0.18))",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-                flexShrink: 0,
-              }}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#1f2937"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z" />
-                <line x1="9" y1="3" x2="9" y2="18" />
-                <line x1="15" y1="6" x2="15" y2="21" />
-              </svg>
-            </div>
-
-            <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: "1.05rem",
-                  fontWeight: 800,
-                  color: "#111827",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  marginBottom: "-0.15rem",
-                }}
-              >
-                U.S. Performance Heatmap
-              </div>
-              <div
-                style={{
-                  fontSize: "0.7rem",
-                  color: "#6b7280",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  lineHeight: 1.0,
-                  paddingBottom: "0.5rem",
-                }}
-              >
-                Indexed vs baseline
-              </div>
-            </div>
-          </div>
-
-          {/* ================= EXEC-STYLE CALLOUTS ================= */}
-          <div
-            style={{
-              marginTop: "0.65rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.35rem",
-              minWidth: 0,
-            }}
-          >
-            {[
-              { tone: "navy", text: "West leading volume vs target" },
-              { tone: "amber", text: "Midwest softness driven by share" },
-              { tone: "gold", text: "South accelerating on displays" },
-            ].map((item) => (
-              <div
-                key={item.text}
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.45rem",
-                  padding: "0.38rem 0.5rem 0.38rem 0.7rem",
-                  borderRadius: 10,
-                  background: "rgba(255,255,255,0.70)",
-                  border: "1px solid rgba(10,22,51,0.10)",
-                  boxShadow:
-                    "0 7px 14px rgba(10,22,51,0.05), inset 0 1px 0 rgba(255,255,255,0.55)",
-                  fontSize: "0.66rem",
-                  color: "#0A1633",
-                  lineHeight: 1.15,
-                  minWidth: 0,
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 5,
-                    bottom: 5,
-                    width: 3,
-                    borderRadius: 999,
-                    background:
-                      item.tone === "navy"
-                        ? "rgba(10,22,51,0.55)"
-                        : item.tone === "amber"
-                        ? "rgba(245,158,11,0.75)"
-                        : "rgba(242,214,117,0.85)",
-                  }}
-                />
-                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {item.text}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ================= MAP LANE ================= */}
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0, // ✅ critical for flex children
-            height: "100%",
-            display: "flex",
-            justifyContent: "flex-end",
-            alignItems: "flex-start",
-            paddingLeft: "0.75rem",
-            boxSizing: "border-box",
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              maxWidth: 520,
-              minWidth: 0,
-            }}
-          >
-            <ComposableMap
-              projection="geoAlbersUsa"
-              style={{
-                width: "100%",
-                height: "100%",
-              }}
-            >
+    <div style={{ width: "100%", height: "160px", marginBottom: "1.5rem", padding: "0.5rem", fontFamily: "Inter, sans-serif", position: "relative", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", height: "100%", gap: "1.5rem", alignItems: "flex-start" }}>
+        
+        {/* === LEFT: MAP === */}
+        <div style={{ flex: "0 0 250px", height: "100%", display: "flex", alignItems: "center", justifyContent: "flex-start" }}> 
+           <div style={{ width: "100%", height: "100%" }}>
+            <ComposableMap projection="geoAlbersUsa" style={{ width: "100%", height: "100%" }}>
               <Geographies geography={GEO_URL}>
                 {({ geographies }) =>
                   geographies.map((geo) => {
                     const stateCode = FIPS_TO_STATE[geo.id as string];
-                    const value = statePerformance[stateCode];
-
+                    const st = data[stateCode]?.volume;
+                    const pct = st && st.ly > 0 ? (st.val - st.ly) / st.ly : 0;
                     return (
                       <Geography
                         key={geo.rsmKey}
@@ -271,7 +144,7 @@ export default function USHeatmap({
                         onMouseLeave={() => setHoveredState(null)}
                         onClick={() => stateCode && onSelectState?.(stateCode)}
                         style={{
-                          default: { fill: performanceColor(value), outline: "none" },
+                          default: { fill: performanceColor(pct), outline: "none", stroke: "#fff", strokeWidth: 0.5 },
                           hover: { fill: "#1e40af", outline: "none", cursor: "pointer" },
                           pressed: { fill: "#1e3a8a", outline: "none" },
                         }}
@@ -281,56 +154,37 @@ export default function USHeatmap({
                 }
               </Geographies>
             </ComposableMap>
-          </div>
+           </div>
+        </div>
+
+        {/* === RIGHT: SCORECARD === */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.4rem", background: "rgba(255,255,255,0.6)", borderRadius: 12, padding: "8px 12px", border: "1px solid rgba(0,0,0,0.05)" }}>
+            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: 4 }}>
+                <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#1e293b", textTransform: "uppercase" }}>{activeTitle}</div>
+                <div style={{ fontSize: "0.6rem", color: "#64748b", marginLeft: "auto" }}>{loading ? "Loading..." : "vs Last Year"}</div>
+            </div>
+
+            {!loading && activeData && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px 16px" }}>
+                    {Object.keys(KPI_LABELS).map((kpi) => {
+                        const m = activeData[kpi] || { val: 0, ly: 0 };
+                        const pct = m.ly > 0 ? ((m.val - m.ly) / m.ly) * 100 : 0;
+                        return (
+                            <div key={kpi} style={{ display: "flex", flexDirection: "column" }}>
+                                <span style={{ fontSize: "0.55rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{KPI_LABELS[kpi as keyof typeof KPI_LABELS]}</span>
+                                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#0f172a" }}>{formatValue(m.val, kpi)}</span>
+                                    <span style={{ fontSize: "0.6rem", fontWeight: 600, color: pct >= 0 ? "#166534" : "#991b1b" }}>
+                                        {pct > 0 ? "+" : ""}{pct.toFixed(0)}%
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
       </div>
-
-      {/* ================= TOOLTIP ================= */}
-      {hoveredState && metrics && (
-        <div
-          style={{
-            position: "absolute",
-            top: "0.75rem",
-            right: "0.75rem",
-            zIndex: 9999,
-            background: "rgba(255,255,255,0.95)",
-            backdropFilter: "blur(6px)",
-            borderRadius: 12,
-            boxShadow: "0 14px 36px rgba(10,22,51,0.22)",
-            padding: "0.65rem 0.75rem",
-            fontSize: "0.65rem",
-            width: 220,
-            pointerEvents: "none",
-          }}
-        >
-          <div style={{ fontWeight: 800, marginBottom: "0.4rem" }}>
-            {hoveredState} · KPI vs Target
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr auto",
-              rowGap: "0.25rem",
-            }}
-          >
-            {KPI_ORDER.map((kpi) => {
-              const { value, target } = metrics[kpi];
-              const delta = value - target;
-
-              return (
-                <React.Fragment key={kpi}>
-                  <div>{kpi}</div>
-                  <div style={{ color: deltaColor(delta) }}>
-                    {delta > 0 ? "▲ +" : delta < 0 ? "▼ " : ""}
-                    {delta}
-                  </div>
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

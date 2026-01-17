@@ -1,146 +1,79 @@
 import React from "react";
 import {
-  ComposedChart,
-  Line,
+  ResponsiveContainer,
+  BarChart,
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
   CartesianGrid,
-  ReferenceLine,
+  Tooltip,
 } from "recharts";
 
-type TrendPoint = {
-  month: string;
-  cy: number | null;
-  ly: number;
-  target: number;
+type TrendData = {
+  period: string;
+  value: number;
+  value_ly: number;
 };
 
 type TrendChartProps = {
-  title: string;
-  data: TrendPoint[];
+  data: TrendData[];
+  title?: string;
 };
 
-export default function TrendChart({ title, data }: TrendChartProps) {
-  const chartData = data.map(d => ({
-    ...d,
-    delta: d.cy != null ? d.cy - d.target : 0,
-  }));
+const formatYAxis = (val: number) => {
+  if (val >= 1000000000) return `${(val / 1000000000).toFixed(1)}B`;
+  if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+  if (val >= 1000) return `${(val / 1000).toFixed(0)}K`;
+  return val.toLocaleString();
+};
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const cy = payload[0].value;
+    const ly = payload[1]?.value;
+    return (
+      <div style={{ background: "rgba(255, 255, 255, 0.95)", border: "1px solid #e2e8f0", padding: "8px 12px", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+        <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: 700, color: "#64748b", marginBottom: 4 }}>{label}</p>
+        <div style={{ display: "flex", gap: 12, fontSize: "0.8rem", fontWeight: 600 }}>
+            <div style={{color: "#3b82f6"}}>CY: {formatYAxis(cy)}</div>
+            {ly !== undefined && <div style={{color: "#94a3b8"}}>LY: {formatYAxis(ly)}</div>}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+export default function TrendChart({ data, title }: TrendChartProps) {
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Title */}
-      <div
-        style={{
-          marginBottom: "0.75rem",
-          fontWeight: 600,
-          fontSize: "0.9rem",
-          color: "#0A1633",
-        }}
-      >
-        {title}
-      </div>
+      {title && (
+        <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1e293b", marginBottom: "1rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          {title}
+        </div>
+      )}
 
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={chartData}
-            margin={{ top: 8, right: 16, left: 4, bottom: 0 }}
-          >
-            <CartesianGrid stroke="rgba(10,22,51,0.08)" vertical={false} />
-
-            <XAxis
-              dataKey="month"
-              tick={{ fontSize: 20, fill: "#64748b" }}
-              axisLine={false}
-              tickLine={false}
+          <BarChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }} barGap={2}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+            <XAxis 
+                dataKey="period" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 10, fill: "#64748b" }} 
+                dy={10}
             />
-
-            {/* Main axis — tighter domain */}
-            <YAxis
-              yAxisId="main"
-              domain={["dataMin - 6", "dataMax + 6"]}
-              tick={{ fontSize: 11, fill: "#64748b" }}
-              axisLine={false}
-              tickLine={false}
-              width={36}
+            <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 10, fill: "#64748b" }} 
+                tickFormatter={formatYAxis}
             />
-
-            {/* Delta axis */}
-            <YAxis
-              yAxisId="delta"
-              hide
-              domain={[-8, 8]}
-            />
-
-            <ReferenceLine
-              yAxisId="delta"
-              y={0}
-              stroke="rgba(10,22,51,0.18)"
-            />
-
-            <Tooltip
-              contentStyle={{
-                background: "#ffffff",
-                borderRadius: "10px",
-                border: "1px solid rgba(10,22,51,0.08)",
-                boxShadow: "0 6px 16px rgba(10,22,51,0.12)",
-                fontSize: "0.75rem",
-              }}
-              formatter={(value: number, name: string) => {
-                const map: Record<string, string> = {
-                  cy: "CY",
-                  ly: "LY",
-                  target: "Target",
-                  delta: "vs Target",
-                };
-                return [value.toFixed(1), map[name] ?? name];
-              }}
-            />
-
-<Bar
-  yAxisId="delta"
-  dataKey="delta"
-  barSize={38}              // ⬅️ doubled width
-  fill="#000000"            // ⬅️ black columns
-  radius={[10, 10, 10, 10]}
-/>
-
-            {/* Target */}
-            <Line
-              yAxisId="main"
-              type="monotone"
-              dataKey="target"
-              stroke="#94A3B8"
-              strokeDasharray="4 4"
-              strokeWidth={2}
-              dot={false}
-            />
-
-            {/* LY */}
-            <Line
-              yAxisId="main"
-              type="monotone"
-              dataKey="ly"
-              stroke="#64748B"
-              strokeWidth={2}
-              dot={false}
-            />
-
-            {/* CY */}
-            <Line
-              yAxisId="main"
-              type="monotone"
-              dataKey="cy"
-              stroke="#0A1633"
-              strokeWidth={3}
-              dot={false}
-              connectNulls={false}
-              activeDot={{ r: 5, strokeWidth: 2 }}
-            />
-          </ComposedChart>
+            <Tooltip content={<CustomTooltip />} cursor={{fill: "rgba(0,0,0,0.03)"}} />
+            <Bar dataKey="value_ly" name="Last Year" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={12} />
+            <Bar dataKey="value" name="Current Year" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={12} />
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>

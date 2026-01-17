@@ -1,22 +1,11 @@
 import * as React from "react";
 
-/* ======================================================
-   TYPES
-====================================================== */
-
+/* ================= TYPES ================= */
 export type DrillPath = string;
 
-/* ======================================================
-   HOOK
-====================================================== */
-
-/**
- * Returns the expanded path Set and a safe toggle helper.
- */
+/* ================= HOOK ================= */
 export function useDrillState() {
-  const [expanded, setExpanded] = React.useState<Set<DrillPath>>(
-    () => new Set()
-  );
+  const [expanded, setExpanded] = React.useState<Set<DrillPath>>(new Set());
 
   const toggle = React.useCallback((path: DrillPath) => {
     setExpanded(prev => {
@@ -27,34 +16,18 @@ export function useDrillState() {
     });
   }, []);
 
-  const isOpen = React.useCallback(
-    (path: DrillPath) => expanded.has(path),
-    [expanded]
-  );
+  const isOpen = React.useCallback((path: DrillPath) => expanded.has(path), [expanded]);
 
-  return {
-    expanded, // exposed for debugging if needed
-    toggle,
-    isOpen,
-  };
+  return { expanded, toggle, isOpen };
 }
 
-/* ======================================================
-   HELPERS
-====================================================== */
+/* ================= HELPERS ================= */
+type PathSegment = { type: string; id: string } | string;
 
-type PathSegment =
-  | { type: string; id: string }
-  | string;
-
-export function createRowPath(
-  input: PathSegment | PathSegment[]
-): DrillPath {
+export function createRowPath(input: PathSegment | PathSegment[]): DrillPath {
   if (typeof input === "string") return input;
   if (!Array.isArray(input)) return `${input.type}:${input.id}`;
   return input
-    .map(seg =>
-      typeof seg === "string" ? seg : `${seg.type}:${seg.id}`
-    )
+    .map(seg => (typeof seg === "string" ? seg : `${seg.type}:${seg.id}`))
     .join("|");
 }

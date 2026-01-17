@@ -1,416 +1,257 @@
-import React, { useState } from "react";
-import {
-  BarChart3,
-  DollarSign,
-  Percent,
-  MapPin,
-  Droplet,
-  LayoutGrid,
-  Gauge,
-  Megaphone,
-  ChevronRight,
-} from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { BarChart3, DollarSign, Percent, MapPin, Droplet, LayoutGrid, Gauge, Megaphone, ChevronRight } from "lucide-react";
+import { useDashboard } from "../context/DashboardContext";
+import { useDrillState } from "./DrillEngine";
 
-import { useDrillState, createRowPath } from "./DrillEngine";
+type RegionMatrixProps = { selectedMetric?: string | null; };
 
-/* ======================================================
-   TYPES
-====================================================== */
-
-type RegionMatrixProps = {
-  selectedMetric?: string | null;
+type RowData = {
+    id: string; 
+    name: string; 
+    level: "region" | "state" | "wholesaler";
+    data: Record<string, { value: number; delta: number }>;
 };
 
-/* ======================================================
-   LAYOUT CONSTANTS (SINGLE SOURCE OF TRUTH)
-====================================================== */
-
-const FIRST_COL_WIDTH = "180px";
+/* ================= LAYOUT CONSTANTS ================= */
+const FIRST_COL_WIDTH = "220px";
 const COLUMN_GAP = "0.4rem";
-const ROW_PADDING_X = "0.35rem";
-const ROW_PADDING_Y = "0.4rem";
-
-const MATRIX_GRID = (kpiCount: number) =>
-  `${FIRST_COL_WIDTH} repeat(${kpiCount}, minmax(0, 1fr))`;
+const ROW_PADDING_Y = "0.6rem";
+const MATRIX_GRID = (kpiCount: number) => `${FIRST_COL_WIDTH} repeat(${kpiCount}, minmax(0, 1fr))`;
 
 const columnCellStyle: React.CSSProperties = {
-  width: "100%",
-  minWidth: 0, // ✅ critical for preventing grid overflow
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  lineHeight: 1.15,
-};
-
-/* ======================================================
-   CONFIG
-====================================================== */
-
-const regions = [
-  { key: "NE", name: "Northeast" },
-  { key: "MW", name: "Midwest" },
-  { key: "S", name: "Great Lakes" },
-  { key: "W", name: "Southeast" },
-  { key: "C", name: "South Central" },
-  { key: "O", name: "West" },
-];
-
-const statesByRegion: Record<string, { key: string; name: string }[]> = {
-  NE: [
-    { key: "NY", name: "New York" },
-    { key: "MA", name: "Massachusetts" },
-    { key: "PA", name: "Pennsylvania" },
-    { key: "NJ", name: "New Jersey" },
-    { key: "CT", name: "Connecticut" },
-  ],
-  MW: [
-    { key: "IL", name: "Illinois" },
-    { key: "OH", name: "Ohio" },
-    { key: "MI", name: "Michigan" },
-    { key: "IN", name: "Indiana" },
-    { key: "WI", name: "Wisconsin" },
-  ],
-  S: [
-    { key: "TX", name: "Texas" },
-    { key: "FL", name: "Florida" },
-    { key: "GA", name: "Georgia" },
-    { key: "NC", name: "North Carolina" },
-    { key: "TN", name: "Tennessee" },
-  ],
-  W: [
-    { key: "CA", name: "California" },
-    { key: "AZ", name: "Arizona" },
-    { key: "WA", name: "Washington" },
-    { key: "OR", name: "Oregon" },
-    { key: "CO", name: "Colorado" },
-  ],
-  C: [
-    { key: "MO", name: "Missouri" },
-    { key: "KS", name: "Kansas" },
-    { key: "IA", name: "Iowa" },
-    { key: "NE", name: "Nebraska" },
-    { key: "OK", name: "Oklahoma" },
-  ],
-  O: [
-    { key: "PR", name: "Puerto Rico" },
-    { key: "HI", name: "Hawaii" },
-    { key: "AK", name: "Alaska" },
-    { key: "GU", name: "Guam" },
-    { key: "VI", name: "Virgin Islands" },
-  ],
+  width: "100%", minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1.15,
 };
 
 const kpis = [
   { key: "volume", label: "Volume", icon: BarChart3 },
   { key: "revenue", label: "Net Rev", icon: DollarSign },
   { key: "share", label: "Share", icon: Percent },
+  { key: "adshare", label: "Ad Share", icon: Megaphone },
   { key: "pods", label: "PODs", icon: MapPin },
   { key: "taps", label: "TAPs", icon: Droplet },
-  { key: "displays", label: "Displays", icon: LayoutGrid },
   { key: "avd", label: "AVD", icon: Gauge },
-  { key: "adshare", label: "Ad Share", icon: Megaphone },
+  { key: "displays", label: "Displays", icon: LayoutGrid },
 ];
 
-/* ======================================================
-   DUMMY DATA
-====================================================== */
+const REGION_NAMES: Record<string, string> = { 
+    "01": "Region 1", "02": "Region 2", "03": "Region 3", "04": "Region 4", 
+    "05": "Region 5", "06": "Region 6", "07": "Region 7", "08": "Region 8" 
+};
 
-const makeCell = (value: string, delta: number) => ({ value, delta });
+/* ================= HELPERS ================= */
 
-const regionData: Record<string, Record<string, { value: string; delta: number }>> =
-  Object.fromEntries(
-    regions.map((r, i) => [
-      r.key,
-      {
-        volume: makeCell((95 + i * 2).toFixed(1), 1.2 - i * 0.2),
-        revenue: makeCell(`$${(0.8 + i * 0.05).toFixed(2)}B`, 0.4 - i * 0.1),
-        share: makeCell((22 + i * 0.6).toFixed(1) + "%", 0.5 - i * 0.1),
-        pods: makeCell(`${380 + i * 12}K`, 1.1 - i * 0.2),
-        taps: makeCell(`${85 + i * 2.3}K`, 0.7 - i * 0.1),
-        displays: makeCell(`${115 + i * 4}K`, 1.6 - i * 0.3),
-        avd: makeCell((7.4 + i * 0.15).toFixed(1), 0.3 - i * 0.05),
-        adshare: makeCell((17.5 + i * 0.4).toFixed(1) + "%", 0.4 - i * 0.1),
-      },
-    ])
-  );
+// 1. Get Anchor Month
+const getAnchorMonth = (periods: string[]) => {
+    if (!periods || periods.length === 0) return "202512";
+    return [...periods].sort().reverse()[0];
+};
 
-const stateData: Record<string, Record<string, { value: string; delta: number }>> =
-  Object.fromEntries(
-    Object.values(statesByRegion)
-      .flat()
-      .map((s, i) => [
-        s.key,
-        {
-          volume: makeCell((18 + i * 0.9).toFixed(1), 0.8 - i * 0.05),
-          revenue: makeCell(`$${(0.12 + i * 0.01).toFixed(2)}B`, 0.3 - i * 0.04),
-          share: makeCell((4.2 + i * 0.2).toFixed(1) + "%", 0.2 - i * 0.03),
-          pods: makeCell(`${68 + i * 2}K`, 0.6 - i * 0.05),
-          taps: makeCell(`${14 + i * 0.6}K`, 0.4 - i * 0.04),
-          displays: makeCell(`${22 + i * 1.1}K`, 0.7 - i * 0.06),
-          avd: makeCell((6.5 + i * 0.1).toFixed(1), 0.2 - i * 0.03),
-          adshare: makeCell((3.8 + i * 0.15).toFixed(1) + "%", 0.2 - i * 0.04),
-        },
-      ])
-  );
+// 2. Smart Formatting (Consistent with BrandMatrix)
+const formatValue = (val: number, kpiKey: string) => {
+    if (val === null || val === undefined || isNaN(val) || val === 0) return "-";
+    const abs = Math.abs(val);
 
-/* ======================================================
-   HELPERS
-====================================================== */
+    // Percentages & Averages
+    if (kpiKey.includes("share") || kpiKey === "adshare") return `${val.toFixed(1)}%`;
+    if (kpiKey === "avd") return val.toFixed(1);
 
-function deltaColor(delta: number) {
-  if (delta > 0) return "#166534";
-  if (delta < 0) return "#b91c1c";
-  return "#6b7280";
-}
+    // Revenue
+    if (kpiKey === "revenue") {
+        if (abs >= 1.0e9) return `$${(val / 1.0e9).toFixed(1)}B`;
+        if (abs >= 1.0e6) return `$${(val / 1.0e6).toFixed(1)}M`;
+        if (abs >= 1.0e3) return `$${(val / 1.0e3).toFixed(0)}K`;
+        return `$${val.toFixed(0)}`;
+    }
 
-/* ======================================================
-   COMPONENT
-====================================================== */
+    // Counts
+    if (abs >= 1.0e9) return `${(val / 1.0e9).toFixed(1)}B`;
+    if (abs >= 1.0e6) return `${(val / 1.0e6).toFixed(1)}M`;
+    if (abs >= 1.0e3) return `${(val / 1.0e3).toFixed(0)}K`;
 
+    return val.toFixed(0);
+};
+
+/* ================= RECURSIVE ROW RENDERER ================= */
+const MatrixLevel = ({ level, groupBy, parentFilters, pathPrefix, drill, selectedMetric, hoverCol, setHoverCol }: any) => {
+    // ✅ Consuming includeAO
+    const { filters: globalFilters, selectedPeriod, timeScope, includeAO } = useDashboard(); 
+    const [rows, setRows] = useState<RowData[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let mounted = true;
+        const fetchKpi = async (kpi: string) => {
+            const anchor = getAnchorMonth(selectedPeriod);
+            try {
+                const res = await fetch("https://ci-capabilities-api.vercel.app/api/query", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        contract_version: "kpi_request.v1", 
+                        kpi, 
+                        groupBy, 
+                        max_month: anchor, 
+                        scope: timeScope, // ✅ Respect YTD/MTD
+                        filters: { 
+                            ...globalFilters, 
+                            ...parentFilters,
+                            include_ao: includeAO // ✅ Respect AO Toggle
+                        }
+                    })
+                });
+                const json = await res.json();
+                const result: Record<string, { cy: number, ly: number }> = {};
+                if(json.ok) json.result.data_array.forEach((r: string[]) => {
+                    result[r[0]] = { cy: parseFloat(r[1]), ly: parseFloat(r[2]) };
+                });
+                return result;
+            } catch (e) { return {}; }
+        };
+
+        const load = async () => {
+            setLoading(true);
+            const results = await Promise.all(kpis.map(k => fetchKpi(k.key)));
+            
+            if (!mounted) return;
+
+            // Merge Data
+            const allKeys = new Set<string>();
+            results.forEach(res => Object.keys(res).forEach(k => allKeys.add(k)));
+
+            const finalRows: RowData[] = Array.from(allKeys).map(key => {
+                const rowData: any = {};
+                kpis.forEach((kpi, idx) => {
+                    const d = results[idx][key];
+                    if (!d) { rowData[kpi.key] = { value: 0, delta: 0 }; return; }
+                    
+                    const delta = d.ly === 0 ? 0 : ((d.cy - d.ly) / d.ly) * 100;
+                    rowData[kpi.key] = { value: d.cy, delta };
+                });
+
+                return {
+                    id: key,
+                    name: level === "region" ? (REGION_NAMES[key] || key) : key,
+                    level,
+                    data: rowData
+                };
+            });
+
+            // Sort Alphabetically by Name
+            setRows(finalRows.sort((a, b) => a.name.localeCompare(b.name)));
+            setLoading(false);
+        };
+
+        load();
+        return () => { mounted = false; };
+    }, [JSON.stringify(selectedPeriod), timeScope, JSON.stringify(globalFilters), JSON.stringify(parentFilters), includeAO]);
+
+    if (loading) return <div style={{ padding: "8px", paddingLeft: "40px", fontSize: "0.75rem", color: "#94a3b8" }}>Loading {level}s...</div>;
+
+    return (
+        <>
+            {rows.map(row => {
+                const currentPath = pathPrefix ? `${pathPrefix}|${level}:${row.id}` : `${level}:${row.id}`;
+                const isExpanded = drill.isOpen(currentPath);
+                const indent = level === "region" ? 0 : level === "state" ? 20 : 40;
+                
+                return (
+                    <React.Fragment key={row.id}>
+                        {/* ROW RENDER */}
+                        <div 
+                            onClick={() => level !== "wholesaler" && drill.toggle(currentPath)}
+                            style={{ 
+                                display: "grid", gridTemplateColumns: MATRIX_GRID(kpis.length), gap: COLUMN_GAP, padding: `${ROW_PADDING_Y} 0.5rem`, 
+                                borderBottom: "1px solid #f1f5f9", cursor: level !== "wholesaler" ? "pointer" : "default",
+                                background: isExpanded ? "#f8fafc" : "white"
+                            }}
+                        >
+                            <div style={{ paddingLeft: indent, fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6, color: "#334155" }}>
+                                {level !== "wholesaler" && <ChevronRight size={14} style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />}
+                                {level === "wholesaler" && <div style={{width: 14}} />} 
+                                {row.name}
+                            </div>
+                            {kpis.map((kpi, idx) => {
+                                const cell = row.data[kpi.key];
+                                const isFaded = selectedMetric && selectedMetric !== kpi.key;
+                                return (
+                                    <div key={kpi.key} style={{ ...columnCellStyle, opacity: isFaded ? 0.35 : 1, background: hoverCol === idx ? "rgba(59,130,246,0.04)" : "transparent" }} onMouseEnter={() => setHoverCol(idx)} onMouseLeave={() => setHoverCol(null)}>
+                                        <div style={{ fontWeight: 600, fontSize: ".85rem" }}>
+                                            {formatValue(cell.value, kpi.key)}
+                                        </div>
+                                        <div style={{ fontSize: "0.65rem", fontWeight: 600, color: cell.delta > 0 ? "#166534" : cell.delta < 0 ? "#b91c1c" : "#6b7280" }}>
+                                            {cell.delta > 0 ? "+" : ""}{cell.delta.toFixed(1)}%
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* RECURSIVE CHILD RENDER */}
+                        {isExpanded && level === "region" && (
+                            <MatrixLevel 
+                                level="state" 
+                                groupBy="state" 
+                                parentFilters={{ region: [row.id] }} 
+                                pathPrefix={currentPath} 
+                                drill={drill} 
+                                selectedMetric={selectedMetric}
+                                hoverCol={hoverCol}
+                                setHoverCol={setHoverCol}
+                            />
+                        )}
+                        {isExpanded && level === "state" && (
+                            <MatrixLevel 
+                                level="wholesaler" 
+                                groupBy="wholesaler" 
+                                parentFilters={{ ...parentFilters, state: [row.id] }} 
+                                pathPrefix={currentPath} 
+                                drill={drill} 
+                                selectedMetric={selectedMetric}
+                                hoverCol={hoverCol}
+                                setHoverCol={setHoverCol}
+                            />
+                        )}
+                    </React.Fragment>
+                );
+            })}
+        </>
+    );
+};
+
+/* ================= MAIN EXPORT ================= */
 export default function RegionMatrix({ selectedMetric }: RegionMatrixProps) {
   const drill = useDrillState();
   const [hoverCol, setHoverCol] = useState<number | null>(null);
 
   return (
-    <div
-      style={{
-        padding: "0.25rem",
-        fontFamily:
-          "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        fontVariantNumeric: "tabular-nums",
-        height: "100%",
-        minWidth: 0,          // ✅ allow shrink
-        overflowY: "auto",    // ✅ vertical scroll only
-        overflowX: "clip",    // ✅ prevents phantom horizontal overflow
-        boxSizing: "border-box",
-      }}
-    >
-      {/* ================= STICKY HEADERS ================= */}
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 2,
-          background: "white",
-          borderBottom: "1px solid rgba(0,0,0,0.06)",
-          minWidth: 0,
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: MATRIX_GRID(kpis.length),
-            gap: COLUMN_GAP,
-            padding: `${ROW_PADDING_Y} ${ROW_PADDING_X}`,
-            alignItems: "stretch",
-            minWidth: 0, // ✅
-          }}
-        >
-          <div style={{ minWidth: 0 }} />
-          {kpis.map((kpi, idx) => {
-            const Icon = kpi.icon;
-            const isHovered = hoverCol === idx;
-
-            return (
-              <div
-                key={kpi.key}
-                onMouseEnter={() => setHoverCol(idx)}
-                onMouseLeave={() => setHoverCol(null)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minWidth: 0,
-                  background: isHovered ? "rgba(59,130,246,0.06)" : "transparent",
-                  transition: "background 120ms ease",
-                }}
-              >
-                <div style={columnCellStyle}>
-                  <Icon size={13} />
-                  <span
-                    style={{
-                      fontSize: "0.65rem",
-                      fontWeight: 500,
-                      color: "#9ca3af",
-                      marginTop: "2px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {kpi.label}
-                  </span>
-                </div>
+    <div style={{ padding: "0.25rem", fontFamily: "Inter, sans-serif", height: "100%", overflowY: "auto", overflowX: "clip" }}>
+      
+      {/* HEADERS */}
+      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "white", borderBottom: "2px solid #e2e8f0" }}>
+        <div style={{ display: "grid", gridTemplateColumns: MATRIX_GRID(kpis.length), gap: COLUMN_GAP, padding: `${ROW_PADDING_Y} 0.5rem` }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Hierarchy</div>
+          {kpis.map((kpi, idx) => (
+            <div key={kpi.key} style={{ display: "flex", justifyContent: "center", background: hoverCol === idx ? "rgba(59,130,246,0.06)" : "transparent" }} onMouseEnter={() => setHoverCol(idx)} onMouseLeave={() => setHoverCol(null)}>
+              <div style={columnCellStyle}>
+                <kpi.icon size={13} className="text-slate-500" />
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#64748b", marginTop: "2px" }}>{kpi.label}</span>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ================= ROWS ================= */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.05rem", minWidth: 0 }}>
-        {regions.map((region) => {
-          const regionPath = createRowPath([{ type: "region", id: region.key }]);
-          const regionExpanded = drill.isOpen(regionPath);
-
-          return (
-            <React.Fragment key={region.key}>
-              {/* REGION ROW */}
-              <div
-                onClick={() => drill.toggle(regionPath)}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: MATRIX_GRID(kpis.length),
-                  gap: COLUMN_GAP,
-                  padding: `${ROW_PADDING_Y} ${ROW_PADDING_X}`,
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  background: regionExpanded ? "rgba(11,30,58,0.08)" : "transparent",
-                  minWidth: 0, // ✅
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 650,
-                    fontSize: "1.0rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    minWidth: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <ChevronRight
-                    size={14}
-                    style={{
-                      flex: "0 0 auto",
-                      transform: regionExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                      transition: "transform 0.15s ease",
-                    }}
-                  />
-                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {region.name}
-                  </span>
-                </div>
-
-                {kpis.map((kpi, idx) => {
-                  const cell = regionData[region.key][kpi.key];
-                  const faded = selectedMetric && selectedMetric !== kpi.key;
-                  const isHovered = hoverCol === idx;
-
-                  return (
-                    <div
-                      key={kpi.key}
-                      onMouseEnter={() => setHoverCol(idx)}
-                      onMouseLeave={() => setHoverCol(null)}
-                      style={{
-                        ...columnCellStyle,
-                        opacity: faded ? 0.35 : 1,
-                        background: isHovered ? "rgba(59,130,246,0.04)" : "transparent",
-                        transition: "background 120ms ease",
-                      }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: ".9rem" }}>{cell.value}</div>
-                      <div
-                        style={{
-                          fontSize: "0.5rem",
-                          fontWeight: 600,
-                          color: deltaColor(cell.delta),
-                        }}
-                      >
-                        {cell.delta > 0 ? "+" : ""}
-                        {cell.delta.toFixed(2)}%
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* STATE ROWS */}
-              {regionExpanded &&
-                statesByRegion[region.key].map((state) => {
-                  const statePath = createRowPath([
-                    { type: "region", id: region.key },
-                    { type: "state", id: state.key },
-                  ]);
-
-                  return (
-                    <div
-                      key={state.key}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        drill.toggle(statePath);
-                      }}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: MATRIX_GRID(kpis.length),
-                        gap: COLUMN_GAP,
-                        padding: `${ROW_PADDING_Y} ${ROW_PADDING_X}`,
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        background: "rgba(11,30,58,0.04)",
-                        minWidth: 0, // ✅
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          fontSize: "0.75rem",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          paddingLeft: "18px",
-                          minWidth: 0,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        <ChevronRight size={12} style={{ flex: "0 0 auto" }} />
-                        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {state.name}
-                        </span>
-                      </div>
-
-                      {kpis.map((kpi, idx) => {
-                        const cell = stateData[state.key][kpi.key];
-                        const isHovered = hoverCol === idx;
-
-                        return (
-                          <div
-                            key={kpi.key}
-                            onMouseEnter={() => setHoverCol(idx)}
-                            onMouseLeave={() => setHoverCol(null)}
-                            style={{
-                              ...columnCellStyle,
-                              background: isHovered ? "rgba(59,130,246,0.04)" : "transparent",
-                              transition: "background 120ms ease",
-                            }}
-                          >
-                            <div style={{ fontWeight: 500, fontSize: "0.7rem" }}>
-                              {cell.value}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.6rem",
-                                fontWeight: 600,
-                                color: deltaColor(cell.delta),
-                              }}
-                            >
-                              {cell.delta > 0 ? "+" : ""}
-                              {cell.delta.toFixed(2)}%
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-            </React.Fragment>
-          );
-        })}
-      </div>
+      {/* TOP LEVEL (REGIONS) */}
+      <MatrixLevel 
+        level="region" 
+        groupBy="region" 
+        parentFilters={{}} 
+        pathPrefix="" 
+        drill={drill} 
+        selectedMetric={selectedMetric} 
+        hoverCol={hoverCol} 
+        setHoverCol={setHoverCol} 
+      />
     </div>
   );
 }

@@ -126,11 +126,15 @@ export default function SupportPage() {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          ping: true,
-          requestedAt: new Date().toISOString(),
-          origin,
-        }),
+// Update the body in your POST test:
+body: JSON.stringify({
+  contract_version: "kpi_request.v1",
+  kpi: "volume",
+  filters: {
+    // Optional: Test a filter to make sure the SQL builder works
+    megabrand: ["MICHELOB ULTRA"] 
+  }
+}),
       })
     );
     setResults([...next]);

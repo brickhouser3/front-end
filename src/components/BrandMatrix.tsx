@@ -1,504 +1,232 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import useBaseUrl from "@docusaurus/useBaseUrl";
-import { ChevronRight } from "lucide-react";
+import { BarChart3, DollarSign, Percent, MapPin, Droplet, LayoutGrid, Gauge, Megaphone, ChevronRight, Layers } from "lucide-react";
+import { useDashboard, BRAND_CODES } from "../context/DashboardContext";
+import { useDrillState } from "./DrillEngine";
 
-import { useDrillState, createRowPath } from "./DrillEngine";
+type BrandMatrixProps = { selectedMetric?: string | null; };
 
-/* ======================================================
-   TYPES
-====================================================== */
+// ✅ METRIC CONFIGURATION
+const ADDITIVE_KPIS = ["volume", "revenue", "pods", "taps", "displays"];
 
-type BrandMatrixProps = {
-  selectedMetric?: string | null;
+const formatValue = (val: number, kpiKey: string) => {
+    if (val === null || val === undefined || isNaN(val) || val === 0) return "-";
+    const abs = Math.abs(val);
+
+    if (kpiKey.includes("share") || kpiKey === "adshare") return `${val.toFixed(1)}%`;
+    if (kpiKey === "avd") return val.toFixed(1);
+
+    if (kpiKey === "revenue") {
+        if (abs >= 1.0e9) return `$${(val / 1.0e9).toFixed(1)}B`;
+        if (abs >= 1.0e6) return `$${(val / 1.0e6).toFixed(1)}M`;
+        if (abs >= 1.0e3) return `$${(val / 1.0e3).toFixed(0)}K`;
+        return `$${val.toFixed(0)}`;
+    }
+
+    if (abs >= 1.0e9) return `${(val / 1.0e9).toFixed(1)}B`;
+    if (abs >= 1.0e6) return `${(val / 1.0e6).toFixed(1)}M`;
+    if (abs >= 1.0e3) return `${(val / 1.0e3).toFixed(0)}K`;
+
+    return val.toFixed(0);
 };
 
-/* ======================================================
-   LAYOUT CONSTANTS (MATCH REGION MATRIX)
-====================================================== */
-
-const FIRST_COL_WIDTH = "180px";
-const COLUMN_GAP = "0.4rem";
-const ROW_PADDING_X = "0.35rem";
-const ROW_PADDING_Y = "0.2rem";
-
-/* Header-specific rhythm */
-const HEADER_PADDING_TOP = "0.35rem";
-const HEADER_PADDING_BOTTOM = "0.55rem";
-const HEADER_DIVIDER_PADDING_BOTTOM = "0.35rem";
-
-const MATRIX_GRID = (brandCount: number) =>
-  `${FIRST_COL_WIDTH} repeat(${brandCount}, minmax(0, 1fr))`;
-
-const columnCellStyle: React.CSSProperties = {
-  width: "100%",
-  minWidth: 0, // ✅ critical in grids
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
+const getAnchorMonth = (periods: string[]) => {
+    if (!periods || periods.length === 0) return "202512"; 
+    return [...periods].sort().reverse()[0];
 };
 
-/* Chevron centering */
-const chevBoxStyle: React.CSSProperties = {
-  width: 18,
-  height: 18,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flex: "0 0 18px",
-};
-
-const rowLabelBase: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  minHeight: 24,
-  minWidth: 0, // ✅ allow label to shrink
-  lineHeight: 1.1,
-};
-
-/* ======================================================
-   SIZES (LOCKED TO REGION MATRIX)
-====================================================== */
-
-const SIZES = {
-  topHeader: "1.0rem",
-  topValue: "0.9rem",
-  topDelta: "0.5rem",
-
-  subHeader: "0.75rem",
-  subValue: "0.7rem",
-  subDelta: "0.5rem",
-};
-
-/* ======================================================
-   CONFIG
-====================================================== */
-
-const brands = [
-  { key: "BDL", name: "Bud Light", logo: "/img/brand_logos/BDL.jpg" },
-  { key: "BHL", name: "Busch Light", logo: "/img/brand_logos/BHL.jpg" },
-  { key: "MUL", name: "Michelob Ultra", logo: "/img/brand_logos/MUL.jpg" },
-  { key: "BUD", name: "Budweiser", logo: "/img/brand_logos/BUD.jpg" },
-  { key: "CWFM", name: "Cutwater", logo: "/img/brand_logos/CWFM.jpg" },
-  { key: "KGA", name: "Big Wave", logo: "/img/brand_logos/KGA.png" },
-  { key: "NUTRL", name: "NUTRL", logo: "/img/brand_logos/NUTRL.png" },
-  { key: "STA", name: "Stella Artois", logo: "/img/brand_logos/STA.jpg" },
+const BRAND_COLS = ["BDL", "BHL", "MUL", "BUD", "STA", "NUTRL", "KGA", "CWFM"];
+const BRAND_LOGOS: Record<string, string> = { "BDL": "BDL.jpg", "BHL": "BHL.jpg", "MUL": "MUL.jpg", "BUD": "BUD.jpg", "STA": "STA.jpg", "NUTRL": "NUTRL.png", "KGA": "KGA.png", "CWFM": "CWFM.jpg" };
+const KPI_CONFIG = [
+  { key: "volume", label: "Volume", icon: BarChart3 }, { key: "revenue", label: "Net Rev", icon: DollarSign },
+  { key: "share", label: "Share", icon: Percent }, { key: "adshare", label: "Ad Share", icon: Megaphone },
+  { key: "pods", label: "PODs", icon: MapPin }, { key: "taps", label: "TAPs", icon: Droplet },
+  { key: "avd", label: "AVD", icon: Gauge }, { key: "displays", label: "Displays", icon: LayoutGrid },
 ];
 
-const kpis = [
-  { key: "volume", label: "Volume" },
-  { key: "revenue", label: "Net Revenue" },
-  { key: "share", label: "Share" },
-  { key: "pods", label: "PODs" },
-  { key: "taps", label: "TAPs" },
-  { key: "displays", label: "Displays" },
-  { key: "avd", label: "AVD" },
-  { key: "adshare", label: "Ad Share" },
-];
+const GRID = `115px repeat(${BRAND_COLS.length}, minmax(60px, 1fr)) 80px`; 
+const columnCellStyle: React.CSSProperties = { width: "100%", minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1.15 };
 
-/* ======================================================
-   HIERARCHY
-====================================================== */
+// --- SUB-LEVEL RENDERER ---
+const DrillLevel = ({ kpi, groupBy, parentFilters }: any) => {
+    const { filters, selectedPeriod, timeScope, includeAO } = useDashboard(); // ✅ AO
+    const [rows, setRows] = useState<{name: string, data: number[]}[]>([]);
+    const [loading, setLoading] = useState(true);
 
-const regions = [
-  {
-    id: "mw",
-    name: "Midwest",
-    states: [
-      {
-        id: "MO",
-        name: "Missouri",
-        channels: [
-          { id: "grocery", name: "Grocery" },
-          { id: "convenience", name: "Convenience" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "west",
-    name: "West",
-    states: [
-      {
-        id: "CA",
-        name: "California",
-        channels: [{ id: "grocery", name: "Grocery" }],
-      },
-    ],
-  },
-];
+    useEffect(() => {
+        let mounted = true;
+        const fetchData = async (brandFilter?: string) => {
+            const anchor = getAnchorMonth(selectedPeriod);
+            const body: any = { 
+                contract_version: "kpi_request.v1", kpi, groupBy, max_month: anchor, scope: timeScope, 
+                filters: { ...filters, ...parentFilters, include_ao: includeAO } 
+            };
+            if(brandFilter) body.filters.megabrand = [brandFilter];
 
-/* ======================================================
-   METRIC STUB (UPDATED NET REV LOGIC)
-====================================================== */
+            try {
+                const res = await fetch("https://ci-capabilities-api.vercel.app/api/query", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+                const json = await res.json();
+                const map: Record<string, number> = {};
+                if (json.ok) json.result.data_array.forEach((r: string[]) => map[r[0]] = parseFloat(r[1]));
+                return map;
+            } catch { return {}; }
+        };
 
-function getMetricValue(
-  kpi: string,
-  brand: string,
-  grainKey: string
-): { value: string; delta: number } {
-  const hash = Math.abs(
-    (kpi + brand + grainKey)
-      .split("")
-      .reduce((a, c) => a + c.charCodeAt(0), 0)
-  );
+        const load = async () => {
+            setLoading(true);
+            const brandMaps = await Promise.all(BRAND_COLS.map(b => fetchData(b)));
+            const totalMap = await fetchData(); 
 
-  const basePct = ((hash % 80) - 40) / 10; // -4.0% to +4.0%
-  const delta = ((hash % 60) - 30) / 10; // -3.0% to +3.0%
+            if (!mounted) return;
 
-  if (kpi === "revenue") {
-    return { value: `${basePct.toFixed(1)}%`, delta };
-  }
+            const allKeys = new Set(Object.keys(totalMap));
+            BRAND_COLS.forEach((_, i) => Object.keys(brandMaps[i]).forEach(k => allKeys.add(k)));
 
-  if (kpi === "share" || kpi === "adshare") {
-    return { value: `${(Math.abs(basePct) / 2).toFixed(1)}%`, delta };
-  }
+            const isAdditive = ADDITIVE_KPIS.includes(kpi);
 
-  return { value: (Math.abs(basePct) * 10).toFixed(1), delta };
-}
+            const finalRows = Array.from(allKeys).map(key => {
+                let rowSum = 0;
+                const colValues = BRAND_COLS.map((_, i) => {
+                    const val = brandMaps[i][key] || 0;
+                    rowSum += val;
+                    return val;
+                });
 
-/* ======================================================
-   HELPERS
-====================================================== */
+                // ✅ HYBRID TOTAL LOGIC (Sum Additive, API for Others)
+                const totalVal = isAdditive ? rowSum : (totalMap[key] || 0);
+                
+                colValues.push(totalVal);
+                return { name: key, data: colValues };
+            });
 
-function deltaColor(delta: number) {
-  if (delta > 0) return "#166534";
-  if (delta < 0) return "#b91c1c";
-  return "#6b7280";
-}
+            setRows(finalRows.sort((a,b) => b.data[b.data.length-1] - a.data[a.data.length-1]));
+            setLoading(false);
+        };
+        load();
+        return () => { mounted = false; };
+    }, [kpi, groupBy, JSON.stringify(selectedPeriod), timeScope, JSON.stringify(filters), includeAO]);
 
-function formatDelta(delta: number) {
-  const sign = delta > 0 ? "+" : "";
-  return `${sign}${delta.toFixed(2)}%`;
-}
+    if (loading) return <div style={{ padding: "8px 0 8px 40px", fontSize: "0.7rem", color: "#94a3b8" }}>Loading details...</div>;
 
-/* ======================================================
-   CELL RENDER
-====================================================== */
-
-function MetricCell({
-  value,
-  delta,
-  hovered,
-  size,
-}: {
-  value: string;
-  delta: number;
-  hovered: boolean;
-  size: "top" | "sub";
-}) {
-  return (
-    <div
-      style={{
-        ...columnCellStyle,
-        background: hovered ? "rgba(59,130,246,0.04)" : "transparent",
-      }}
-    >
-      <div
-        style={{
-          fontSize: size === "top" ? SIZES.topValue : SIZES.subValue,
-          fontWeight: 600,
-          lineHeight: 1.05,
-        }}
-      >
-        {value}
-      </div>
-      <div
-        style={{
-          fontSize: size === "top" ? SIZES.topDelta : SIZES.subDelta,
-          fontWeight: 600,
-          color: deltaColor(delta),
-          lineHeight: 1.05,
-        }}
-      >
-        {formatDelta(delta)}
-      </div>
-    </div>
-  );
-}
-
-/* ======================================================
-   COMPONENT
-====================================================== */
-
-export default function BrandMatrix({ selectedMetric }: BrandMatrixProps) {
-  const baseUrl = useBaseUrl("/");
-  const drill = useDrillState();
-  const [hoverCol, setHoverCol] = useState<number | null>(null);
-
-  const brandsWithLogos = brands.map((b) => ({
-    ...b,
-    logo: `${baseUrl}${b.logo.replace(/^\//, "")}`,
-  }));
-
-  return (
-    <div
-      style={{
-        height: "100%",
-        minWidth: 0, // ✅ allow shrink inside parent grid/card
-        overflowY: "auto",
-        overflowX: "clip", // ✅ prevent horizontal scrollbars from escaping
-        fontFamily:
-          "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        fontVariantNumeric: "tabular-nums",
-      }}
-    >
-      {/* ================= MATRIX TITLE ================= */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.75rem",
-          padding: "0.75rem 0.75rem 1.5rem",
-          minWidth: 0,
-        }}
-      >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background:
-              "linear-gradient(135deg, rgba(59,130,246,0.18), rgba(99,102,241,0.18))",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-            flexShrink: 0,
-          }}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#1f2937"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="3" width="7" height="7" />
-            <rect x="14" y="3" width="7" height="7" />
-            <rect x="14" y="14" width="7" height="7" />
-            <rect x="3" y="14" width="7" height="7" />
-          </svg>
-        </div>
-
-        <div style={{ lineHeight: 1.1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: "1.05rem",
-              fontWeight: 700,
-              letterSpacing: "-0.01em",
-              color: "#111827",
-            }}
-          >
-            Brand Performance
-          </div>
-          <div
-            style={{
-              fontSize: "0.7rem",
-              fontWeight: 500,
-              color: "#6b7280",
-              marginTop: "0.15rem",
-            }}
-          >
-            By KPI · Click rows to drill
-          </div>
-        </div>
-      </div>
-
-      {/* ================= STICKY HEADER ================= */}
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 2,
-          background: "white",
-          paddingTop: HEADER_PADDING_TOP,
-          minWidth: 0,
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: MATRIX_GRID(brandsWithLogos.length),
-            gap: COLUMN_GAP,
-            padding: `0 ${ROW_PADDING_X} ${HEADER_PADDING_BOTTOM}`,
-            alignItems: "center",
-            minWidth: 0, // ✅ prevent grid from forcing width
-          }}
-        >
-          <div style={{ minWidth: 0 }} />
-          {brandsWithLogos.map((b, idx) => (
-            <div
-              key={b.key}
-              onMouseEnter={() => setHoverCol(idx)}
-              onMouseLeave={() => setHoverCol(null)}
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                minWidth: 0,
-                background:
-                  hoverCol === idx ? "rgba(59,130,246,0.06)" : "transparent",
-              }}
-            >
-              <img
-                src={b.logo}
-                alt={b.name}
-                style={{
-                  height: 30,
-                  maxWidth: "100%", // ✅ never exceed cell
-                  objectFit: "contain",
-                }}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div
-          style={{
-            borderBottom: "1px solid rgba(0,0,0,0.06)",
-            marginBottom: HEADER_DIVIDER_PADDING_BOTTOM,
-          }}
-        />
-      </div>
-
-      {/* ================= BODY ================= */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.05rem", minWidth: 0 }}>
-        {kpis.map((kpi) => {
-          const kpiPath = createRowPath({ type: "kpi", id: kpi.key });
-          const kpiOpen = drill.isOpen(kpiPath);
-
-          return (
-            <React.Fragment key={kpi.key}>
-              {/* KPI ROW */}
-              <div
-                onClick={() => drill.toggle(kpiPath)}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: MATRIX_GRID(brandsWithLogos.length),
-                  gap: COLUMN_GAP,
-                  padding: `${ROW_PADDING_Y} ${ROW_PADDING_X}`,
-                  cursor: "pointer",
-                  marginBottom: kpiOpen ? "0.05rem" : "0.2rem",
-                  background: kpiOpen ? "rgba(11,30,58,0.08)" : "transparent",
-                  borderRadius: "8px",
-                  minWidth: 0, // ✅
-                }}
-              >
-                <div
-                  style={{
-                    ...rowLabelBase,
-                    fontSize: SIZES.topHeader,
-                    fontWeight: 650,
-                  }}
-                >
-                  <span style={chevBoxStyle}>
-                    <ChevronRight
-                      size={14}
-                      style={{
-                        transform: kpiOpen ? "rotate(90deg)" : "rotate(0deg)",
-                        transition: "transform 160ms ease",
-                        opacity: 0.6,
-                      }}
-                    />
-                  </span>
-                  {kpi.label}
+    return (
+        <div style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+            {rows.map((r, idx) => (
+                <div key={idx} style={{ display: "grid", gridTemplateColumns: GRID, gap: 4, padding: "6px 0", borderTop: idx===0 ? "none" : "1px dashed #e2e8f0" }}>
+                    <div style={{ paddingLeft: 40, fontSize: "0.75rem", color: "#64748b", fontWeight: 500 }}>{r.name}</div>
+                    {r.data.map((val, i) => (
+                        <div key={i} style={{ textAlign: "center", fontSize: "0.75rem", color: "#64748b" }}>{formatValue(val, kpi)}</div>
+                    ))}
                 </div>
+            ))}
+        </div>
+    );
+};
 
-                {brandsWithLogos.map((b, idx) => {
-                  const cell = getMetricValue(kpi.key, b.key, kpi.key);
-                  return (
-                    <div
-                      key={b.key}
-                      onMouseEnter={() => setHoverCol(idx)}
-                      onMouseLeave={() => setHoverCol(null)}
-                      style={{ minWidth: 0 }}
-                    >
-                      <MetricCell
-                        value={cell.value}
-                        delta={cell.delta}
-                        hovered={hoverCol === idx}
-                        size="top"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+/* ================= MAIN COMPONENT ================= */
+export default function BrandMatrix({ selectedMetric }: BrandMatrixProps) {
+  const { filters, selectedPeriod, timeScope, includeAO } = useDashboard(); // ✅ AO
+  const drill = useDrillState();
+  const baseUrl = useBaseUrl("/");
+  const [drillLevel, setDrillLevel] = useState("region");
+  const [kpiRows, setKpiRows] = useState<Record<string, number[]>>({});
+  const [loading, setLoading] = useState(true);
 
-              {/* LOWER LEVELS */}
-              {kpiOpen &&
-                regions.map((r) => {
-                  const regionPath = createRowPath([
-                    { type: "kpi", id: kpi.key },
-                    { type: "region", id: r.id },
-                  ]);
-                  const regionOpen = drill.isOpen(regionPath);
+  useEffect(() => {
+      let mounted = true;
+      const fetchTopLevel = async () => {
+          setLoading(true);
+          const anchor = getAnchorMonth(selectedPeriod);
 
-                  return (
-                    <div key={r.id} style={{ minWidth: 0 }}>
-                      <div
-                        onClick={() => drill.toggle(regionPath)}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: MATRIX_GRID(brandsWithLogos.length),
-                          gap: COLUMN_GAP,
-                          padding: `${ROW_PADDING_Y} ${ROW_PADDING_X}`,
-                          background: "rgba(0,0,0,0.035)",
-                          minWidth: 0, // ✅
-                        }}
-                      >
-                        <div
-                          style={{
-                            ...rowLabelBase,
-                            fontSize: SIZES.subHeader,
-                            fontWeight: 600,
-                            paddingLeft: 14,
-                          }}
-                        >
-                          <span style={chevBoxStyle}>
-                            <ChevronRight
-                              size={13}
-                              style={{
-                                transform: regionOpen
-                                  ? "rotate(90deg)"
-                                  : "rotate(0deg)",
-                                transition: "transform 160ms ease",
-                                opacity: 0.6,
-                              }}
-                            />
-                          </span>
-                          {r.name}
-                        </div>
+          const fetchKpiTotals = async (kpi: string) => {
+             const commonFilters = { ...filters, include_ao: includeAO };
+             const bodyBrand = { contract_version: "kpi_request.v1", kpi, groupBy: "megabrand", max_month: anchor, scope: timeScope, filters: commonFilters };
+             const bodyTotal = { contract_version: "kpi_request.v1", kpi, groupBy: "total", max_month: anchor, scope: timeScope, filters: commonFilters };
+             
+             try {
+                 const [resBrand, resTotal] = await Promise.all([
+                     fetch("https://ci-capabilities-api.vercel.app/api/query", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(bodyBrand) }),
+                     fetch("https://ci-capabilities-api.vercel.app/api/query", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(bodyTotal) })
+                 ]);
+                 const jsonBrand = await resBrand.json();
+                 const jsonTotal = await resTotal.json();
 
-                        {brandsWithLogos.map((b, idx) => {
-                          const cell = getMetricValue(kpi.key, b.key, r.id);
-                          return (
-                            <div
-                              key={b.key}
-                              onMouseEnter={() => setHoverCol(idx)}
-                              onMouseLeave={() => setHoverCol(null)}
-                              style={{ minWidth: 0 }}
-                            >
-                              <MetricCell
-                                value={cell.value}
-                                delta={cell.delta}
-                                hovered={hoverCol === idx}
-                                size="sub"
-                              />
+                 const brandMap: Record<string, number> = {};
+                 if(jsonBrand.ok) jsonBrand.result.data_array.forEach((r: string[]) => brandMap[r[0]] = parseFloat(r[1]));
+                 
+                 const rowData = BRAND_COLS.map(b => brandMap[b] || 0);
+
+                 // ✅ HYBRID TOTAL LOGIC (Match Drill Logic)
+                 let grandTotal = 0;
+                 if (ADDITIVE_KPIS.includes(kpi)) {
+                     grandTotal = rowData.reduce((sum, val) => sum + val, 0);
+                 } else {
+                     grandTotal = jsonTotal.ok && jsonTotal.result.data_array.length > 0 ? parseFloat(jsonTotal.result.data_array[0][1]) : 0;
+                 }
+
+                 rowData.push(grandTotal);
+                 return rowData;
+             } catch { return []; }
+          };
+
+          const allData: Record<string, number[]> = {};
+          await Promise.all(KPI_CONFIG.map(async (k) => { allData[k.key] = await fetchKpiTotals(k.key); }));
+
+          if(mounted) { setKpiRows(allData); setLoading(false); }
+      };
+      fetchTopLevel();
+      return () => { mounted = false; };
+  }, [JSON.stringify(selectedPeriod), timeScope, JSON.stringify(filters), includeAO]);
+
+  return (
+    <div style={{ padding: "0.5rem", height: "100%", display: "flex", flexDirection: "column", fontFamily: "Inter, sans-serif", overflowX: "auto" }}>
+        
+        {/* CONTROLS */}
+        <div style={{ display: "flex", gap: 12, padding: "8px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", alignItems: "center", minWidth: "fit-content" }}>
+            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 4 }}>
+                <Layers size={14} /> Drill Dimension:
+            </div>
+            <select value={drillLevel} onChange={(e) => setDrillLevel(e.target.value)} style={{ fontSize: "0.75rem", padding: "4px", borderRadius: 4, border: "1px solid #cbd5e1" }}>
+                <option value="region">Region</option>
+                <option value="state">State</option>
+                <option value="channel">Channel</option>
+                <option value="wholesaler">Wholesaler</option>
+            </select>
+        </div>
+
+        {/* HEADERS */}
+        <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 4, padding: "8px 0", borderBottom: "2px solid #e2e8f0", alignItems: "end", background: "white", position: "sticky", top: 0, zIndex: 10, minWidth: "fit-content" }}>
+            <div style={{fontWeight: 700, fontSize: "0.7rem", color: "#94a3b8", paddingLeft: 8}}>METRIC / DRILL</div>
+            {BRAND_COLS.map(b => (
+                <div key={b} style={{ display: "flex", justifyContent: "center" }}>
+                    <img src={`${baseUrl}img/brand_logos/${BRAND_LOGOS[b]}`} style={{ height: 28, objectFit: "contain" }} alt={b} />
+                </div>
+            ))}
+            <div style={{ fontWeight: 800, textAlign: "center", fontSize: "0.75rem", color: "#1e293b" }}>TOTAL</div>
+        </div>
+
+        {/* BODY */}
+        <div style={{ flex: 1, overflowY: "auto", minWidth: "fit-content" }}>
+            {!loading && KPI_CONFIG.map(kpi => {
+                const values = kpiRows[kpi.key] || [];
+                const isExpanded = drill.isOpen(kpi.key);
+                return (
+                    <React.Fragment key={kpi.key}>
+                        <div onClick={() => drill.toggle(kpi.key)} style={{ display: "grid", gridTemplateColumns: GRID, gap: 4, padding: "10px 0", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isExpanded ? "#f1f5f9" : "white" }}>
+                            <div style={{ paddingLeft: 8, fontWeight: 700, fontSize: "0.8rem", color: "#334155", display: "flex", alignItems: "center", gap: 8 }}>
+                                <ChevronRight size={14} style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
+                                <div style={{display: "flex", alignItems: "center", gap: 6}}><kpi.icon size={14} className="text-slate-400" />{kpi.label}</div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-            </React.Fragment>
-          );
-        })}
-      </div>
+                            {values.map((val, i) => (
+                                <div key={i} style={{ textAlign: "center", fontSize: i===values.length-1 ? "0.85rem" : "0.8rem", fontWeight: i===values.length-1 ? 800 : 600, color: i===values.length-1 ? "#0f172a" : "#475569" }}>
+                                    {formatValue(val, kpi.key)}
+                                </div>
+                            ))}
+                        </div>
+                        {isExpanded && <DrillLevel kpi={kpi.key} groupBy={drillLevel} parentFilters={{}} />}
+                    </React.Fragment>
+                );
+            })}
+        </div>
     </div>
   );
 }
