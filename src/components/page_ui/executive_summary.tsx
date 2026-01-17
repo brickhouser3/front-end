@@ -6,7 +6,7 @@ import USHeatmap from "../../components/USHeatmap";
 import RegionMatrix from "../../components/RegionMatrix";
 import BrandMatrix from "../../components/BrandMatrix";
 
-import KPI from "../../components/KPI"; // Check casing matches your file (KPI.tsx vs kpi.tsx)
+import KPI from "../../components/kpi"; // Check casing matches your file (KPI.tsx vs kpi.tsx)
 import TrendChart from "../../components/TrendChart";
 import { 
   TrendingDown, 
